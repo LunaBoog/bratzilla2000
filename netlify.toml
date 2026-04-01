@@ -1,8 +1,6 @@
-cat > netlify.toml << 'EOF'
 [build]
   publish = "public"
 
 [[edge_functions]]
   function = "search"
   path = "/api/search"
-EOF
