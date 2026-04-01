@@ -1,6 +1,8 @@
+cat > netlify.toml << 'EOF'
 [build]
   publish = "public"
-  functions = "netlify/functions"
 
-[functions]
-  node_bundler = "esbuild"
+[[edge_functions]]
+  function = "search"
+  path = "/api/search"
+EOF
