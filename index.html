@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bratzilla 2000</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💎</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0b0b0f;
+            --surface: #141419;
+            --surface2: #1c1c24;
+            --border: rgba(255,255,255,.06);
+            --border-hover: rgba(255,255,255,.12);
+            --text: #e8e6f0;
+            --text-dim: #7a7890;
+            --text-faint: #4a4860;
+            --accent: #c471f5;
+            --accent2: #fa71cd;
+            --green: #4ade80;
+            --green-dim: rgba(74,222,128,.12);
+            --gold: #fbbf24;
+            --gold-dim: rgba(251,191,36,.12);
+            --red: #f87171;
+            --card-bg: #17171e;
+            --card-hover: #1e1e28;
+            --radius: 14px;
+            --radius-sm: 10px;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Instrument Sans', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+        .syne { font-family: 'Syne', sans-serif; }
+
+        /* Layout */
+        .shell { max-width: 1140px; margin: 0 auto; padding: 0 20px; }
+
+        /* Header */
+        .hdr { padding: 36px 0 28px; position: relative; }
+        .hdr::after {
+            content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+            width: 600px; height: 300px; opacity: .07;
+            background: radial-gradient(ellipse, var(--accent) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .hdr-top { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; position: relative; }
+        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 2rem; letter-spacing: -1px; color: #fff; }
+        .logo em { font-style: normal; font-size: .9em; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-left: 6px; }
+        .tagline { font-size: .72rem; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+
+        .btn-watchlist {
+            background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+            padding: 8px 18px; border-radius: 40px; font-size: .78rem; font-weight: 600;
+            cursor: pointer; transition: all .2s; position: relative;
+        }
+        .btn-watchlist:hover { border-color: var(--border-hover); background: var(--card-hover); }
+        .wl-badge {
+            position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
+            background: var(--accent); color: #fff; font-size: 10px; font-weight: 700;
+            border-radius: 50%; display: none; align-items: center; justify-content: center;
+        }
+        .wl-badge.on { display: flex; }
+
+        /* Search */
+        .search-box { display: flex; gap: 10px; margin-bottom: 14px; }
+        .search-input {
+            flex: 1; background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 14px 18px; color: #fff;
+            font-size: .88rem; font-family: inherit; outline: none; transition: border .2s;
+        }
+        .search-input:focus { border-color: rgba(196,113,245,.4); }
+        .search-input::placeholder { color: var(--text-faint); }
+        .btn-scan {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff; border: none; padding: 14px 36px; border-radius: var(--radius);
+            font-size: .82rem; font-weight: 700; letter-spacing: .8px; cursor: pointer;
+            transition: all .2s; white-space: nowrap;
+        }
+        .btn-scan:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-scan:disabled { opacity: .4; cursor: not-allowed; transform: none; filter: none; }
+
+        /* Mode Tabs */
+        .modes { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .mode-btn {
+            background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
+            padding: 7px 16px; border-radius: 40px; font-size: .72rem; font-weight: 600;
+            cursor: pointer; transition: all .2s; letter-spacing: .3px;
+        }
+        .mode-btn:hover { color: var(--text); border-color: var(--border-hover); }
+        .mode-btn.active { background: rgba(196,113,245,.12); border-color: rgba(196,113,245,.3); color: var(--accent); }
+
+        /* Quick Tags */
+        .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+        .tag {
+            font-size: .68rem; font-weight: 500; padding: 5px 12px;
+            border-radius: 40px; background: var(--surface); color: var(--text-dim);
+            border: 1px solid var(--border); cursor: pointer; transition: all .15s;
+        }
+        .tag:hover { color: #fff; border-color: var(--border-hover); }
+
+        /* Status */
+        .status {
+            display: none; margin: 20px 0; padding: 18px 24px;
+            background: rgba(196,113,245,.05); border: 1px solid rgba(196,113,245,.1);
+            border-radius: var(--radius); text-align: center;
+        }
+        .status.on { display: block; }
+        .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid var(--accent); border-top-color: transparent;
+            border-radius: 50%; animation: spin .7s linear infinite;
+            vertical-align: middle; margin-right: 10px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .status-msg { color: var(--accent); font-size: .82rem; font-weight: 500; }
+
+        /* Stream Preview */
+        .stream-box {
+            display: none; margin: 12px 0; padding: 14px; max-height: 90px;
+            overflow-y: auto; background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); font-size: .68rem; color: var(--text-faint);
+            font-family: 'Courier New', monospace; line-height: 1.5;
+        }
+        .stream-box.on { display: block; }
+
+        /* Error */
+        .error-bar {
+            display: none; margin: 16px 0; padding: 16px 20px;
+            background: rgba(248,113,113,.06); border: 1px solid rgba(248,113,113,.15);
+            border-radius: var(--radius); color: var(--red); font-size: .82rem; text-align: center;
+        }
+        .error-bar.on { display: block; }
+
+        /* Stats */
+        .stats {
+            display: none; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0;
+        }
+        .stats.on { display: grid; }
+        .stat {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 16px; text-align: center;
+        }
+        .stat-val { font-size: 1.6rem; font-weight: 800; font-family: 'Syne', sans-serif; }
+        .stat-lbl { font-size: .6rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-top: 3px; font-weight: 600; }
+
+        /* Filters */
+        .filters {
+            display: none; gap: 14px; flex-wrap: wrap; align-items: center;
+            padding: 14px 18px; background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); margin-bottom: 20px;
+        }
+        .filters.on { display: flex; }
+        .f-group { display: flex; align-items: center; gap: 6px; }
+        .f-lbl { font-size: .62rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+        .f-sel, .f-inp {
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 8px; padding: 6px 10px; color: #fff;
+            font-size: .72rem; font-family: inherit; outline: none;
+        }
+        .f-inp { width: 65px; }
+        .f-count { margin-left: auto; font-size: .68rem; color: var(--text-faint); }
+
+        /* Results Grid */
+        .grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 14px; padding-bottom: 60px;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg); border: 1px solid var(--border);
+            border-radius: var(--radius); overflow: hidden; transition: all .25s;
+            position: relative;
+        }
+        .card:hover { border-color: var(--border-hover); transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+        .card.deal { border-left: 3px solid var(--green); }
+        .card.rare-card { border-left: 3px solid var(--gold); }
+        .card-body { padding: 18px; }
+        .card-platform {
+            display: inline-block; font-size: .58rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 1px; padding: 3px 8px; border-radius: 4px; margin-bottom: 10px;
+        }
+        .plat-ebay { background: rgba(59,130,246,.12); color: #60a5fa; }
+        .plat-mercari { background: rgba(248,113,113,.12); color: #fca5a5; }
+        .plat-poshmark { background: rgba(74,222,128,.12); color: #86efac; }
+        .plat-depop { background: rgba(251,191,36,.12); color: #fcd34d; }
+        .plat-other { background: rgba(255,255,255,.06); color: var(--text-dim); }
+        .card-title {
+            font-weight: 600; font-size: .82rem; color: #fff; line-height: 1.4;
+            margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical; overflow: hidden; min-height: 38px;
+        }
+        .card-price { font-size: 1.5rem; font-weight: 800; color: #fff; font-family: 'Syne', sans-serif; }
+        .card-est { font-size: .75rem; color: var(--text-dim); text-decoration: line-through; margin-left: 8px; }
+        .card-meta {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px;
+            margin: 12px 0 16px; padding: 12px 0; border-top: 1px solid var(--border);
+        }
+        .meta-item { display: flex; justify-content: space-between; }
+        .meta-k { font-size: .7rem; color: var(--text-dim); }
+        .meta-v { font-size: .7rem; font-weight: 600; color: var(--text); }
+        .meta-v.profit { color: var(--green); }
+        .card-foot { display: flex; align-items: center; justify-content: space-between; }
+        .rarity-pill {
+            font-size: .58rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .5px; padding: 4px 10px; border-radius: 40px;
+        }
+        .r-high { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; }
+        .r-mid { background: rgba(59,130,246,.15); color: #60a5fa; }
+        .r-low { background: rgba(255,255,255,.06); color: var(--text-dim); }
+        .hot-tag {
+            position: absolute; top: 12px; right: 12px;
+            background: var(--green); color: #0b0b0f; font-size: .58rem;
+            font-weight: 700; padding: 3px 10px; border-radius: 40px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.6} }
+        .btn-row { display: flex; gap: 6px; }
+        .btn-sm {
+            font-size: .68rem; padding: 6px 12px; border-radius: 8px;
+            font-weight: 600; cursor: pointer; border: none; transition: all .15s;
+            text-decoration: none; display: inline-block;
+        }
+        .btn-save { background: var(--surface2); color: var(--text-dim); }
+        .btn-save:hover { background: var(--gold-dim); color: var(--gold); }
+        .btn-view { background: #fff; color: var(--bg); }
+        .btn-view:hover { background: var(--accent); }
+
+        /* Empty State */
+        .empty { text-align: center; padding: 80px 20px; }
+        .empty-ico { font-size: 3rem; margin-bottom: 14px; animation: bob 4s ease-in-out infinite; }
+        @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+        .empty h3 { font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 6px; }
+        .empty p { font-size: .82rem; color: var(--text-dim); max-width: 380px; margin: 0 auto; line-height: 1.5; }
+
+        /* Modal */
+        .overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
+            backdrop-filter: blur(6px); z-index: 100; align-items: center; justify-content: center;
+        }
+        .overlay.on { display: flex; }
+        .modal {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 20px; padding: 24px; max-width: 480px;
+            width: calc(100% - 32px); max-height: 80vh; overflow-y: auto; color: var(--text);
+        }
+        .modal-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .modal-top h3 { font-size: 1rem; font-weight: 700; }
+        .modal-x { background: none; border: none; font-size: 1.3rem; color: var(--text-dim); cursor: pointer; }
+        .wl-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .wl-item:last-child { border-bottom: none; }
+        .wl-info { flex: 1; min-width: 0; }
+        .wl-name { font-size: .82rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .wl-detail { font-size: .72rem; color: var(--text-dim); margin-top: 3px; }
+        .btn-rm { font-size: .68rem; color: var(--red); background: none; border: none; cursor: pointer; white-space: nowrap; }
+        .btn-rm:hover { text-decoration: underline; }
+
+        /* Responsive */
+        @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } .stats { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 600px) {
+            .grid { grid-template-columns: 1fr; }
+            .logo { font-size: 1.6rem; }
+            .search-box { flex-direction: column; }
+            .btn-scan { width: 100%; }
+            .filters { flex-direction: column; align-items: stretch; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="shell">
+    <header class="hdr">
+        <div class="hdr-top">
+            <div>
+                <div class="logo">BRATZILLA<em>2000</em></div>
+                <div class="tagline">Marketplace Scanner &middot; Real Listings Only</div>
+            </div>
+            <button class="btn-watchlist" onclick="toggleWatchlist()">
+                Saved
+                <span class="wl-badge" id="wlBadge">0</span>
+            </button>
+        </div>
+
+        <div class="search-box">
+            <input type="text" class="search-input" id="searchInput" value="bratz doll" placeholder="Search dolls, lots, collections..." onkeydown="if(event.key==='Enter')startScan()">
+            <button class="btn-scan" id="scanBtn" onclick="startScan()">SCAN</button>
+        </div>
+
+        <div class="modes">
+            <button class="mode-btn active" data-mode="deals" onclick="setMode(this)">💰 Best Deals</button>
+            <button class="mode-btn" data-mode="rare" onclick="setMode(this)">✨ Rare Finds</button>
+            <button class="mode-btn" data-mode="lots" onclick="setMode(this)">📦 Lots & Bundles</button>
+        </div>
+
+        <div class="tags">
+            <span class="tag" onclick="setQ('bratz doll')">bratz doll</span>
+            <span class="tag" onclick="setQ('bratz doll lot')">bratz lot</span>
+            <span class="tag" onclick="setQ('bratz babyz')">babyz</span>
+            <span class="tag" onclick="setQ('bratz rock angelz')">rock angelz</span>
+            <span class="tag" onclick="setQ('bratz nrfb')">nrfb</span>
+            <span class="tag" onclick="setQ('bratz genie magic')">genie magic</span>
+            <span class="tag" onclick="setQ('bratz tokyo a go-go')">tokyo a go-go</span>
+            <span class="tag" onclick="setQ('bratz forever diamondz')">forever diamondz</span>
+            <span class="tag" onclick="setQ('bratz wild wild west')">wild west</span>
+        </div>
+    </header>
+
+    <div class="status" id="statusBar">
+        <span class="spinner"></span>
+        <span class="status-msg" id="statusMsg">Searching marketplaces...</span>
+    </div>
+
+    <div class="stream-box" id="streamBox"></div>
+    <div class="error-bar" id="errorBar"></div>
+
+    <div class="stats" id="statsBar">
+        <div class="stat"><div class="stat-val" id="sListings" style="color:#fff">0</div><div class="stat-lbl">Listings</div></div>
+        <div class="stat"><div class="stat-val" id="sProfit" style="color:var(--green)">$0</div><div class="stat-lbl">Avg Profit</div></div>
+        <div class="stat"><div class="stat-val" id="sRare" style="color:var(--gold)">0</div><div class="stat-lbl">Rare</div></div>
+        <div class="stat"><div class="stat-val" id="sBest" style="color:var(--accent)">—</div><div class="stat-lbl">Top Deal</div></div>
+    </div>
+
+    <div class="filters" id="filterBar">
+        <div class="f-group">
+            <span class="f-lbl">Sort</span>
+            <select class="f-sel" id="fSort" onchange="render()">
+                <option value="profit">Highest Profit</option>
+                <option value="rarity">Rarest First</option>
+                <option value="price_low">Price ↑</option>
+                <option value="price_high">Price ↓</option>
+            </select>
+        </div>
+        <div class="f-group">
+            <span class="f-lbl">Platform</span>
+            <select class="f-sel" id="fPlatform" onchange="render()"><option value="all">All</option></select>
+        </div>
+        <div class="f-group">
+            <span class="f-lbl">Min Profit $</span>
+            <input type="number" class="f-inp" id="fMinProfit" value="0" min="0" step="5" onchange="render()">
+        </div>
+        <span class="f-count" id="fCount"></span>
+    </div>
+
+    <div id="resultsArea">
+        <div class="empty">
+            <div class="empty-ico">💎</div>
+            <h3>Ready to Hunt</h3>
+            <p>Hit SCAN to search eBay, Mercari, Poshmark and more for real Bratz doll listings with profit analysis.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Watchlist Modal -->
+<div class="overlay" id="wlModal" onclick="if(event.target===this)toggleWatchlist()">
+    <div class="modal">
+        <div class="modal-top">
+            <h3 id="wlTitle">Saved (0)</h3>
+            <button class="modal-x" onclick="toggleWatchlist()">&times;</button>
+        </div>
+        <div id="wlContent"></div>
+    </div>
+</div>
+
+<script>
+let allListings = [];
+let watchlist = JSON.parse(localStorage.getItem('bratzilla_wl') || '[]');
+let scanning = false;
+let currentMode = 'deals';
+
+const RARE_DB = {
+    "tokyo a go-go":{r:9,v:200},"genie magic":{r:9,v:250},"first edition":{r:10,v:400},
+    "prototype":{r:10,v:500},"limited edition":{r:8,v:200},"bratz babyz":{r:8,v:150},
+    "princess":{r:8,v:180},"twiins":{r:8,v:200},"twins":{r:8,v:200},"treasures":{r:8,v:180},
+    "wild wild west":{r:7,v:120},"wintertime wonderland":{r:7,v:110},"campfire":{r:7,v:110},
+    "rock angelz":{r:7,v:120},"forever diamondz":{r:7,v:100},"passion 4 fashion":{r:6,v:80},
+    "formal funk":{r:6,v:75},"nrfb":{r:8,v:160},"collector edition":{r:7,v:150},
+    "tokyo":{r:8,v:130},"paris":{r:7,v:95},"bratz boyz":{r:7,v:90},
+    "kidz":{r:7,v:100},"magic hair":{r:5,v:60},"sun kissed":{r:5,v:65},
+    "slumber party":{r:6,v:85},"midnight dance":{r:6,v:80},"spring break":{r:5,v:60},
+    "space angelz":{r:7,v:110},"pretty n punk":{r:6,v:85},"strut it":{r:6,v:80},
+    "girls nite out":{r:6,v:75},"live in concert":{r:6,v:80},"ice champions":{r:6,v:90},
+    "masquerade":{r:7,v:100},"flashback fever":{r:6,v:85}
+};
+
+window.addEventListener('DOMContentLoaded', () => updateBadge());
+
+function setQ(t) { document.getElementById('searchInput').value = t; }
+function setMode(el) {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    currentMode = el.dataset.mode;
+}
+
+function showStatus(msg) {
+    document.getElementById('statusMsg').textContent = msg;
+    document.getElementById('statusBar').classList.add('on');
+}
+function hideStatus() { document.getElementById('statusBar').classList.remove('on'); }
+function showError(msg) {
+    const el = document.getElementById('errorBar');
+    el.textContent = msg; el.classList.add('on');
+    setTimeout(() => el.classList.remove('on'), 10000);
+}
+
+async function startScan() {
+    if (scanning) return;
+    const query = document.getElementById('searchInput').value.trim();
+    if (!query) { showError('Enter a search term first.'); return; }
+
+    scanning = true;
+    const btn = document.getElementById('scanBtn');
+    btn.disabled = true; btn.textContent = 'SCANNING...';
+    document.getElementById('errorBar').classList.remove('on');
+
+    const stream = document.getElementById('streamBox');
+    stream.textContent = ''; stream.classList.add('on');
+
+    try {
+        showStatus(`Searching eBay, Mercari, Poshmark for "${query}"... (~20s)`);
+
+        const resp = await fetch('/api/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, mode: currentMode })
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.error || 'Server error ' + resp.status);
+        }
+
+        // Read the SSE stream
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+                try {
+                    const evt = JSON.parse(data);
+                    if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+                        fullText += evt.delta.text;
+                        stream.textContent = fullText.slice(-400);
+                        stream.scrollTop = stream.scrollHeight;
+                    }
+                } catch(e) {}
+            }
+        }
+
+        stream.classList.remove('on');
+        showStatus('Analyzing listings...');
+
+        allListings = parseListings(fullText);
+
+        if (allListings.length === 0) {
+            showError('No listings found. Try a different search term or try again in a minute.');
+        }
+
+        updatePlatformFilter();
+        updateStats();
+        render();
+        document.getElementById('statsBar').classList.add('on');
+        document.getElementById('filterBar').classList.add('on');
+
+    } catch (err) {
+        console.error(err);
+        stream.classList.remove('on');
+        showError(err.message || 'Scan failed. Please try again.');
+    } finally {
+        scanning = false;
+        hideStatus();
+        btn.disabled = false;
+        btn.textContent = 'SCAN';
+    }
+}
+
+function parseListings(text) {
+    const listings = [];
+
+    // Method 1: Structured LISTING_START/LISTING_END blocks
+    const blocks = text.split('LISTING_START');
+    for (let i = 1; i < blocks.length; i++) {
+        const block = blocks[i].split('LISTING_END')[0];
+        if (!block) continue;
+
+        const get = (key) => {
+            const m = block.match(new RegExp(key + ':\\s*(.+)', 'i'));
+            return m ? m[1].trim() : '';
+        };
+
+        const title = get('TITLE');
+        const priceStr = get('PRICE').replace(/[$,]/g, '');
+        const price = parseFloat(priceStr);
+        const platform = get('PLATFORM') || 'eBay';
+        const condition = get('CONDITION') || 'Used';
+        const shippingStr = get('SHIPPING');
+        const shipping = /free/i.test(shippingStr) ? 0 : parseFloat(shippingStr.replace(/[$,]/g, '')) || 0;
+        const url = get('URL');
+
+        if (title && price > 0 && price < 5000) {
+            const analysis = assess(title, price);
+            listings.push({
+                id: rndId(), title, price, platform: normPlatform(platform),
+                condition, shipping, url: cleanUrl(url), ...analysis
+            });
+        }
+    }
+
+    // Method 2: Fallback — parse **title** - $price on Platform format
+    if (listings.length < 3) {
+        const fallbackBlocks = text.split(/(?=\*\*[^*]+\*\*\s*[-–—]\s*\$|\d+[\.\)]\s+\*\*)/);
+        for (const block of fallbackBlocks) {
+            if (block.trim().length < 20) continue;
+            const priceMatch = block.match(/\$\s*([\d,]+\.?\d{0,2})/);
+            if (!priceMatch) continue;
+            const price = parseFloat(priceMatch[1].replace(',', ''));
+            if (price <= 0 || price > 5000) continue;
+
+            let title = '';
+            const boldMatch = block.match(/\*\*([^*]+)\*\*/);
+            if (boldMatch) title = boldMatch[1].trim();
+            else { const lm = block.match(/(?:\d+[\.\)]\s*)?([A-Z][^\n$]{10,100})/); if (lm) title = lm[1].trim(); }
+            title = title.replace(/\*\*/g, '').replace(/^\d+[\.\)]\s*/, '').trim();
+            if (title.length < 5) continue;
+
+            // Skip if we already have this title
+            if (listings.some(l => l.title.toLowerCase() === title.toLowerCase())) continue;
+
+            const urlMatch = block.match(/https?:\/\/[^\s\)\]>"]+/);
+            const url = urlMatch ? cleanUrl(urlMatch[0]) : '';
+
+            let condition = 'Used';
+            const cl = block.toLowerCase();
+            if (/\b(nrfb|sealed|new in box)\b/.test(cl)) condition = 'New/NRFB';
+            else if (/\bnew\b/.test(cl)) condition = 'New';
+            else if (/\b(like new|excellent)\b/.test(cl)) condition = 'Like New';
+            else if (/\b(good|pre-owned)\b/.test(cl)) condition = 'Good';
+
+            let platform = 'eBay';
+            if (cl.includes('mercari')) platform = 'Mercari';
+            else if (cl.includes('poshmark')) platform = 'Poshmark';
+            else if (cl.includes('depop')) platform = 'Depop';
+
+            const shipMatch = block.match(/shipping[:\s]*\$?([\d.]+)/i);
+            const shipping = /free\s*shipping/i.test(block) ? 0 : (shipMatch ? parseFloat(shipMatch[1]) : 0);
+
+            const analysis = assess(title, price);
+            listings.push({ id: rndId(), title, price, platform, condition, shipping, url, ...analysis });
+        }
+    }
+
+    // Deduplicate
+    const seen = new Set();
+    return listings.filter(l => {
+        const key = l.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+function assess(title, price) {
+    const lower = title.toLowerCase();
+    let maxR = 2, estV = 30;
+
+    for (const [kw, d] of Object.entries(RARE_DB)) {
+        if (lower.includes(kw) && d.r > maxR) { maxR = d.r; estV = d.v; }
+    }
+
+    if (/\b(nrfb|sealed|unopened)\b/.test(lower)) { estV *= 1.4; maxR = Math.min(10, maxR + 1); }
+    else if (/\b(mint|new)\b/.test(lower)) estV *= 1.3;
+    else if (/\b(like new|excellent)\b/.test(lower)) estV *= 1.1;
+    if (/\b(complete|all accessories|all original)\b/.test(lower)) estV *= 1.25;
+    if (/\b(box|boxed|package|carded)\b/.test(lower)) { estV *= 1.2; maxR = Math.min(10, maxR + 1); }
+
+    const ym = lower.match(/(200[0-5])/);
+    if (ym) {
+        const yr = parseInt(ym[1]);
+        if (yr <= 2002) { estV *= 1.3; maxR = Math.min(10, maxR + 1); }
+        else if (yr <= 2005) estV *= 1.2;
+    }
+
+    if (/\b(lot|bundle|collection)\b/.test(lower)) {
+        const nm = lower.match(/(\d+)\s*(dolls?|pieces?|pc|pcs)/);
+        if (nm) estV = Math.max(estV, parseInt(nm[1]) * 18);
+    }
+
+    const fees = price * 0.13;
+    const ship = 8;
+    const profit = Math.max(0, estV - price - fees - ship);
+    const confidence = maxR > 3 ? Math.min(85, 40 + maxR * 5) : 35;
+
+    return {
+        rarityScore: maxR,
+        estimatedValue: Math.round(estV * 100) / 100,
+        profitPotential: Math.round(profit * 100) / 100,
+        confidence
+    };
+}
+
+function normPlatform(p) {
+    const l = p.toLowerCase().trim();
+    if (l.includes('ebay')) return 'eBay';
+    if (l.includes('mercari')) return 'Mercari';
+    if (l.includes('poshmark')) return 'Poshmark';
+    if (l.includes('depop')) return 'Depop';
+    return p;
+}
+
+function cleanUrl(url) {
+    return url.replace(/[\)\]\.,;'"]+$/, '').replace(/\*+$/, '');
+}
+
+function rndId() { return Math.random().toString(36).slice(2, 10); }
+
+function getFiltered() {
+    const sort = document.getElementById('fSort').value;
+    const plat = document.getElementById('fPlatform').value;
+    const minP = parseFloat(document.getElementById('fMinProfit').value) || 0;
+
+    let f = allListings.filter(l => (plat === 'all' || l.platform === plat) && l.profitPotential >= minP);
+
+    f.sort((a, b) => {
+        if (sort === 'profit') return b.profitPotential - a.profitPotential;
+        if (sort === 'rarity') return b.rarityScore - a.rarityScore;
+        if (sort === 'price_low') return a.price - b.price;
+        if (sort === 'price_high') return b.price - a.price;
+        return 0;
+    });
+    return f;
+}
+
+function updateStats() {
+    const f = getFiltered();
+    document.getElementById('sListings').textContent = f.length;
+    const avg = f.length ? f.reduce((s, l) => s + l.profitPotential, 0) / f.length : 0;
+    document.getElementById('sProfit').textContent = '$' + Math.round(avg);
+    document.getElementById('sRare').textContent = f.filter(l => l.rarityScore >= 7).length;
+    const best = f.length ? f.reduce((b, l) => l.profitPotential > b.profitPotential ? l : b, f[0]) : null;
+    document.getElementById('sBest').textContent = best ? '$' + Math.round(best.profitPotential) : '—';
+}
+
+function updatePlatformFilter() {
+    const sel = document.getElementById('fPlatform');
+    const platforms = [...new Set(allListings.map(l => l.platform))];
+    sel.innerHTML = '<option value="all">All</option>';
+    platforms.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; sel.appendChild(o); });
+}
+
+function render() {
+    const filtered = getFiltered();
+    updateStats();
+    document.getElementById('fCount').textContent = filtered.length + ' of ' + allListings.length;
+    const area = document.getElementById('resultsArea');
+
+    if (!filtered.length && !allListings.length) {
+        area.innerHTML = '<div class="empty"><div class="empty-ico">💎</div><h3>Ready to Hunt</h3><p>Hit SCAN to search marketplaces for real listings.</p></div>';
+        return;
+    }
+    if (!filtered.length) {
+        area.innerHTML = '<div class="empty"><div class="empty-ico">🔍</div><h3>No Matches</h3><p>Try lowering the minimum profit or changing the platform filter.</p></div>';
+        return;
+    }
+
+    let h = '<div class="grid">';
+    for (const l of filtered) {
+        const isDeal = l.profitPotential > 10;
+        const isRare = l.rarityScore >= 7;
+        const cardClass = isDeal ? 'deal' : isRare ? 'rare-card' : '';
+        const platClass = l.platform === 'eBay' ? 'plat-ebay' : l.platform === 'Mercari' ? 'plat-mercari' : l.platform === 'Poshmark' ? 'plat-poshmark' : l.platform === 'Depop' ? 'plat-depop' : 'plat-other';
+        const rClass = l.rarityScore >= 8 ? 'r-high' : l.rarityScore >= 6 ? 'r-mid' : 'r-low';
+        const rLabel = l.rarityScore >= 8 ? 'RARE' : l.rarityScore >= 6 ? 'UNCOMMON' : 'COMMON';
+        const link = l.url || 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(l.title) + '&LH_BIN=1';
+
+        h += `<div class="card ${cardClass}">
+            ${isDeal && l.profitPotential > 30 ? '<div class="hot-tag">HOT DEAL</div>' : ''}
+            <div class="card-body">
+                <span class="card-platform ${platClass}">${esc(l.platform)}</span>
+                <div class="card-title">${esc(l.title)}</div>
+                <div>
+                    <span class="card-price">$${l.price.toFixed(2)}</span>
+                    ${l.estimatedValue > l.price ? '<span class="card-est">$' + Math.round(l.estimatedValue) + ' est</span>' : ''}
+                </div>
+                <div class="card-meta">
+                    <div class="meta-item"><span class="meta-k">Profit</span><span class="meta-v ${l.profitPotential > 10 ? 'profit' : ''}">$${Math.round(l.profitPotential)}</span></div>
+                    <div class="meta-item"><span class="meta-k">Confidence</span><span class="meta-v">${l.confidence}%</span></div>
+                    <div class="meta-item"><span class="meta-k">Condition</span><span class="meta-v">${esc(l.condition)}</span></div>
+                    <div class="meta-item"><span class="meta-k">Shipping</span><span class="meta-v">${l.shipping === 0 ? 'Free' : '$' + l.shipping.toFixed(0)}</span></div>
+                </div>
+                <div class="card-foot">
+                    <span class="rarity-pill ${rClass}">${rLabel} ${l.rarityScore}/10</span>
+                    <div class="btn-row">
+                        <button class="btn-sm btn-save" onclick="saveListing('${l.id}')">Save</button>
+                        <a href="${esc(link)}" target="_blank" rel="noopener" class="btn-sm btn-view">View →</a>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }
+    h += '</div>';
+    area.innerHTML = h;
+}
+
+function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+// Watchlist
+function saveListing(id) {
+    const l = allListings.find(x => x.id === id);
+    if (!l || watchlist.some(w => w.title === l.title)) return;
+    watchlist.push(l);
+    localStorage.setItem('bratzilla_wl', JSON.stringify(watchlist));
+    updateBadge();
+}
+function removeSaved(i) {
+    watchlist.splice(i, 1);
+    localStorage.setItem('bratzilla_wl', JSON.stringify(watchlist));
+    updateBadge();
+    renderWatchlist();
+}
+function updateBadge() {
+    const b = document.getElementById('wlBadge');
+    b.classList.toggle('on', watchlist.length > 0);
+    b.textContent = watchlist.length;
+}
+function toggleWatchlist() {
+    const m = document.getElementById('wlModal');
+    m.classList.toggle('on');
+    if (m.classList.contains('on')) renderWatchlist();
+}
+function renderWatchlist() {
+    document.getElementById('wlTitle').textContent = 'Saved (' + watchlist.length + ')';
+    const c = document.getElementById('wlContent');
+    if (!watchlist.length) {
+        c.innerHTML = '<div style="text-align:center;padding:40px 0"><div style="font-size:2rem;margin-bottom:10px">📋</div><div style="font-weight:700;margin-bottom:4px">Empty</div><div style="font-size:.82rem;color:var(--text-dim)">Save listings to track them here.</div></div>';
+        return;
+    }
+    c.innerHTML = watchlist.map((w, i) =>
+        `<div class="wl-item">
+            <div class="wl-info">
+                <div class="wl-name">${esc(w.title)}</div>
+                <div class="wl-detail">$${w.price.toFixed(2)} on ${w.platform} · Profit: $${Math.round(w.profitPotential)}</div>
+            </div>
+            <button class="btn-rm" onclick="removeSaved(${i})">Remove</button>
+        </div>`
+    ).join('');
+}
+</script>
+</body>
+</html>
