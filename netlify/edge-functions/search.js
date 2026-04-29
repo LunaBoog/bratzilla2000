@@ -357,6 +357,39 @@ export default async (req) => {
     let items = searchData.itemSummaries || [];
     const preFilterCount = items.length;
     items = items.filter((i) => !isJunk(i.title || "", rawQuery));
+
+    // Strict-match filter: if the user's raw query mentions specific Bratz characters
+    // or distinctive terms, the listing title must actually contain at least one of them.
+    // This stops eBay from returning Sasha dolls when you search for Cloe just because
+    // the listing has the word "bratz" in it.
+    const distinctiveTerms = [
+      // Characters
+      "cloe", "chloe", "yasmin", "jade", "sasha", "meygan", "dana", "fianna", "nevra",
+      "jasmin", "raya", "nora", "phoebe", "roxxi",
+      // Lines (multi-word)
+      "rock angelz", "tokyo a go-go", "tokyo a go go", "tokyo", "genie magic", "wild wild west",
+      "forever diamondz", "passion 4 fashion", "passion for fashion", "formal funk",
+      "slumber party", "girls nite out", "girls night out", "ice champions", "wintertime",
+      "treasures", "princess", "twiins", "twins", "prom", "featherageous", "sun kissed",
+      "magic hair", "spring break", "sweet dreamz", "funk n glow", "step out", "pretty n punk",
+      "fashion pixiez", "dynamite", "midnight dance", "live in concert", "secret date",
+      "space angelz", "sleepover", "good vibes", "first edition", "starringas",
+      // Sub-brands
+      "babyz", "kidz", "boyz", "tweevils", "liltz", "petz", "bratzilla", "bratzillaz",
+      // Special qualifiers
+      "nrfb", "sealed", "mib", "misb"
+    ];
+
+    const rawLower = rawQuery.toLowerCase();
+    const userMentionedTerms = distinctiveTerms.filter(t => rawLower.includes(t));
+
+    if (userMentionedTerms.length > 0) {
+      // Build regex: title must contain at least one of the user's distinctive terms
+      const escaped = userMentionedTerms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+      const matchRe = new RegExp(`\\b(${escaped.join("|")})\\b`, "i");
+      items = items.filter(i => matchRe.test(i.title || ""));
+    }
+
     const junkFiltered = preFilterCount - items.length;
 
     if (items.length === 0) {
@@ -413,11 +446,10 @@ export default async (req) => {
         status: 200,
         headers: {
           "Content-Type": "application/json",
-          // Browser: don't cache (we want fresh prices on next page load)
-          "Cache-Control": "private, max-age=0, must-revalidate",
-          // Netlify edge: cache for 60s, serve stale for up to 5min while refreshing.
-          // Identical queries within 60s are returned instantly from edge — zero eBay calls.
-          "Netlify-CDN-Cache-Control": "public, s-maxage=60, stale-while-revalidate=300, durable",
+          // No edge caching — every search hits eBay fresh.
+          // Client-side localStorage cache (60s TTL) handles repeat-query optimization.
+          // Edge caching with query-param keys was unreliable in practice.
+          "Cache-Control": "no-store",
           ...CORS,
         },
       }
@@ -433,5 +465,4 @@ export default async (req) => {
 
 export const config = {
   path: "/api/search",
-  cache: "manual",
 };

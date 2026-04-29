@@ -858,6 +858,7 @@ function renderEmpty(h3, p) {
 
 async function startScan() {
   const query = document.getElementById('searchInput').value.trim();
+  console.log('[SCAN]', JSON.stringify({step:'start', query, mode: currentMode, time: new Date().toLocaleTimeString()}));
   if (!query) { showError('Enter a search term first.'); return; }
 
   // Cancel any in-flight scan + bump scan ID so stale callbacks bail
@@ -878,7 +879,9 @@ async function startScan() {
   // Client-side cache check — keyed on (mode, normalized-query) so different searches never collide
   const cacheKey = currentMode + '|' + query.toLowerCase().replace(/\s+/g, ' ').trim();
   const cached = requestCache[cacheKey];
+  console.log('[SCAN]', JSON.stringify({step:'cacheCheck', cacheKey, cacheHit: !!cached, allCacheKeys: Object.keys(requestCache)}));
   if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS) {
+    console.log('[SCAN]', JSON.stringify({step:'cacheServe', firstTitle: cached.data?.listings?.[0]?.title, count: cached.data?.listings?.length}));
     if (myScanId !== scanId) return;  // a newer scan started while we were checking
     allListings = cached.data.listings || [];
     marketStats = cached.data.stats;
@@ -906,6 +909,7 @@ async function startScan() {
   try {
     const t0 = performance.now();
     const url = `/api/search?q=${encodeURIComponent(query)}&mode=${encodeURIComponent(currentMode)}`;
+    console.log('[SCAN]', JSON.stringify({step:'fetch', url}));
     const resp = await fetchWithTimeout(url, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
@@ -921,6 +925,7 @@ async function startScan() {
     }
 
     const data = await resp.json();
+    console.log('[SCAN]', JSON.stringify({step:'fetched', queryEcho: data.rawQuery, count: data.listings?.length, firstTitle: data.listings?.[0]?.title}));
     if (myScanId !== scanId) return;  // recheck after JSON parse
 
     allListings = data.listings || [];
