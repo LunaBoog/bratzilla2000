@@ -63,9 +63,12 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
 async function searchEbay(token, query) {
   // Use relevance (default) — eBay's "best match" beats price-asc for deal hunting
   // fieldgroups=EXTENDED gives us conditionId + better images
+  // category_ids=237 = "Dolls & Bears" — constrains results to actual dolls,
+  // filtering out books, posters, video games, etc. that share keywords with Bratz characters
   const params = new URLSearchParams({
     q: query,
     limit: "50",
+    category_ids: "237",
     fieldgroups: "EXTENDED",
     filter: [
       "buyingOptions:{FIXED_PRICE|AUCTION}",
@@ -165,17 +168,25 @@ function marketValueFor(category, stats, fallbackPrice) {
   return stats[category]?.median || stats.overall?.median || fallbackPrice;
 }
 
-// Drop obvious junk results from doll searches (keychains, t-shirts, posters, etc.)
+// Drop obvious junk results that slip past eBay's category filter
+// (keychains, t-shirts, posters, books with same names, video games, etc.)
 function isJunk(title, query) {
   const t = (title || "").toLowerCase();
   const q = (query || "").toLowerCase();
 
-  const dollSearch = q.includes("doll") || (q.includes("bratz") && !q.includes("accessor"));
-  if (dollSearch) {
-    if (/\b(keychain|key chain|ornament|poster|print\b|sticker|magnet|digital|pdf|mug|t.?shirt|shirt only|patch|button pin|badge|funko)\b/.test(t)) {
-      return true;
-    }
+  // Always reject these regardless of search
+  if (/\b(keychain|key chain|ornament|poster|print\b|sticker|magnet|digital download|pdf|mug|t.?shirt|shirt only|patch|button pin|badge|funko pop|funko\b|coloring book|coloring page|video game|playstation|xbox|nintendo|dvd|vhs|blu.?ray|book\b|paperback|hardcover|novel|warriors|tigerstar|bobblehead|trading card|figurine\s+only)\b/.test(t)) {
+    return true;
   }
+
+  // For doll-focused searches, require the title to actually mention bratz, doll,
+  // or a known Bratz character/line name. This catches things like cat books matching "sasha".
+  const dollSearch = q.includes("doll") || q.includes("bratz");
+  if (dollSearch) {
+    const hasBratzMention = /\b(bratz|bratzilla|bratzillaz|cloe|chloe|yasmin|jade|sasha|meygan|dana|fianna|nevra|jasmin|raya|nora|mga|babyz|kidz|boyz|tweevils|liltz|petz|pretty.n.punk|tokyo|genie|forever diamondz|rock angelz|wild wild west|passion 4 fashion|formal funk|slumber party|girls nite|ice champions|wintertime|treasures|princess|twiins|prom|featherageous|sun kissed|magic hair|spring break|sweet dreamz|passion 4|funk n glow|step out|fashion pixiez|dynamite|midnight dance|live in concert|secret date|nighty.nightz|space angelz|sleepover|on.the.mic|good vibes)\b/i.test(t);
+    if (!hasBratzMention) return true;
+  }
+
   return false;
 }
 
@@ -322,6 +333,14 @@ export default async (req) => {
     }
 
     let query = rawQuery;
+
+    // Auto-add "bratz" to the query if it isn't already there.
+    // Catches cases like searching "sasha" or "cloe" which would otherwise return
+    // tons of unrelated stuff (Tigerstar and Sasha cat books, etc).
+    if (!/\bbratz/i.test(query)) {
+      query = `bratz ${query}`;
+    }
+
     if (mode === "rare") {
       if (!/nrfb|sealed|tokyo|genie|first edition|prototype|rock angelz|princess|twiins|vintage/i.test(query)) {
         query = `${query} NRFB sealed vintage`;
