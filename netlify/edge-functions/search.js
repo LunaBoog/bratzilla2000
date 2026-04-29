@@ -117,6 +117,21 @@ function categorize(title, condition) {
   return "standard";
 }
 
+// Pull the best-available price from an eBay item (handles auctions with 0 bids etc)
+function extractPrice(item) {
+  const candidates = [
+    item.currentBidPrice?.value,
+    item.price?.value,
+    item.priceDisplay,
+    item.minimumPriceToBid?.value,
+  ];
+  for (const c of candidates) {
+    const n = parseFloat(c);
+    if (n > 0) return n;
+  }
+  return 0;
+}
+
 // Compute market stats per category + overall, with outlier trimming
 function computeMarketStats(items) {
   if (!items || items.length === 0) return null;
@@ -130,7 +145,7 @@ function computeMarketStats(items) {
 
   const buckets = { premium: [], standard: [], damaged: [] };
   for (const item of items) {
-    const price = parseFloat(item.price?.value || 0);
+    const price = extractPrice(item);
     if (price <= 0 || price > 2500) continue;
     const cond = condMap[(item.condition || "").toUpperCase()] || item.condition || "Used";
     const cat = categorize(item.title || "", cond);
@@ -191,7 +206,7 @@ function isJunk(title, query) {
 }
 
 function normalizeItem(item, stats) {
-  const price = parseFloat(item.price?.value || 0);
+  const price = extractPrice(item);
   const shipping = parseFloat(item.shippingOptions?.[0]?.shippingCost?.value || 0);
 
   const condMap = {
@@ -389,6 +404,10 @@ export default async (req) => {
       const matchRe = new RegExp(`\\b(${escaped.join("|")})\\b`, "i");
       items = items.filter(i => matchRe.test(i.title || ""));
     }
+
+    // Drop listings without a usable price — usually auctions in a transitional state
+    // where eBay hasn't published the current bid yet. They render as $0.00 otherwise.
+    items = items.filter(i => extractPrice(i) > 0);
 
     const junkFiltered = preFilterCount - items.length;
 
