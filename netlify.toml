@@ -4,3 +4,7 @@
 [[edge_functions]]
   function = "search"
   path = "/api/search"
+
+[[edge_functions]]
+  function = "analyze"
+  path = "/api/analyze"
