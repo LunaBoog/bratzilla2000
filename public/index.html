@@ -614,6 +614,7 @@ let currentMode = 'deals';
 let activeChips = new Set();
 let acIndex = -1;
 let activeAbortController = null;  // for cancelling in-flight scans
+let scanId = 0;  // monotonic ID; callbacks check this to detect stale state
 
 function loadStore(k, d) {
   try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; }
@@ -859,20 +860,26 @@ async function startScan() {
   const query = document.getElementById('searchInput').value.trim();
   if (!query) { showError('Enter a search term first.'); return; }
 
-  // Cancel any in-flight scan so new request wins (typing fast, hitting SCAN twice)
+  // Cancel any in-flight scan + bump scan ID so stale callbacks bail
   if (activeAbortController) { activeAbortController.abort(); }
   activeAbortController = new AbortController();
   const myController = activeAbortController;
+  const myScanId = ++scanId;
+
+  // Clear current listings immediately so user never sees stale results from prior search
+  allListings = [];
+  marketStats = null;
 
   scanning = true;
   const btn = document.getElementById('scanBtn');
   btn.disabled = true; btn.textContent = 'SCANNING...';
   document.getElementById('errorBar').classList.remove('on');
 
-  // Client-side cache check — if same query was scanned within 60s, skip the network entirely
-  const cacheKey = currentMode + '|' + query.toLowerCase();
+  // Client-side cache check — keyed on (mode, normalized-query) so different searches never collide
+  const cacheKey = currentMode + '|' + query.toLowerCase().replace(/\s+/g, ' ').trim();
   const cached = requestCache[cacheKey];
   if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS) {
+    if (myScanId !== scanId) return;  // a newer scan started while we were checking
     allListings = cached.data.listings || [];
     marketStats = cached.data.stats;
     addToHistory(query);
@@ -882,9 +889,10 @@ async function startScan() {
     document.getElementById('marketBar').classList.add('on');
     document.getElementById('filterBar').classList.add('on');
     setTimeout(hideStatus, 1500);
-    // Still run rarity analysis if cache didn't have it
     if (!allListings.some(l => l.rarityScore != null)) {
-      analyzeRarity().finally(() => render());
+      analyzeRarity(myScanId).finally(() => {
+        if (myScanId === scanId) render();
+      });
     }
     scanning = false;
     btn.disabled = false; btn.textContent = 'SCAN';
@@ -897,7 +905,6 @@ async function startScan() {
 
   try {
     const t0 = performance.now();
-    // GET request → enables Netlify edge cache (free, instant for repeat queries)
     const url = `/api/search?q=${encodeURIComponent(query)}&mode=${encodeURIComponent(currentMode)}`;
     const resp = await fetchWithTimeout(url, {
       method: 'GET',
@@ -906,7 +913,7 @@ async function startScan() {
     }, 15000);
 
     // Bail if a newer scan superseded this one
-    if (myController !== activeAbortController) return;
+    if (myScanId !== scanId) return;
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
@@ -914,6 +921,8 @@ async function startScan() {
     }
 
     const data = await resp.json();
+    if (myScanId !== scanId) return;  // recheck after JSON parse
+
     allListings = data.listings || [];
     marketStats = data.stats;
     addToHistory(query);
@@ -921,7 +930,6 @@ async function startScan() {
 
     // Save to client cache
     requestCache[cacheKey] = { ts: Date.now(), data };
-    // Cap to last 20 unique queries to avoid bloating localStorage
     const keys = Object.keys(requestCache);
     if (keys.length > 20) {
       keys.sort((a, b) => (requestCache[a].ts || 0) - (requestCache[b].ts || 0));
@@ -945,31 +953,30 @@ async function startScan() {
     document.getElementById('filterBar').classList.add('on');
 
     if (isSlowConnection()) {
-      // Skip the AI call on cellular/slow — saves ~2-3s and a network round-trip
       hideStatus();
     } else {
-      analyzeRarity().finally(() => {
-        if (myController !== activeAbortController) return;
+      analyzeRarity(myScanId).finally(() => {
+        if (myScanId !== scanId) return;
         hideStatus();
         render();
       });
     }
   } catch (err) {
     if (err.name === 'AbortError') {
-      // Either we cancelled or the timeout fired
-      if (myController === activeAbortController) {
+      if (myScanId === scanId) {
         showError('Search took too long. Tap SCAN to retry.');
         hideStatus();
         renderEmpty('Timed out', 'eBay took too long to respond. Try again — they\'re usually faster.');
       }
       return;
     }
+    if (myScanId !== scanId) return;
     console.error(err);
     showError(err.message || 'Scan failed. Please try again.');
     hideStatus();
     renderEmpty('Something went wrong', err.message || 'Try again in a moment.');
   } finally {
-    if (myController === activeAbortController) {
+    if (myScanId === scanId) {
       scanning = false;
       btn.disabled = false;
       btn.textContent = 'SCAN';
@@ -978,9 +985,12 @@ async function startScan() {
   }
 }
 
-async function analyzeRarity() {
+async function analyzeRarity(myScanId) {
+  // Snapshot the listings we're analyzing so we have a stable reference
   const top = allListings.slice(0, 20);
   if (!top.length) return;
+  // Remember which array these belonged to — if it gets replaced, we bail
+  const myListings = allListings;
   try {
     const resp = await fetchWithTimeout('/api/analyze', {
       method: 'POST',
@@ -989,6 +999,9 @@ async function analyzeRarity() {
     }, 15000);
     if (!resp.ok) return;
     const data = await resp.json();
+    // If a newer scan replaced allListings, don't write to the old one
+    if (myScanId !== undefined && myScanId !== scanId) return;
+    if (myListings !== allListings) return;
     const ratings = data.ratings || [];
     for (const r of ratings) {
       if (top[r.i]) {
