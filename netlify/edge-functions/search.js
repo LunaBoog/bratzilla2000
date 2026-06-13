@@ -1,32 +1,42 @@
-// Bratzilla 2000 — eBay Browse API search (v3.1)
-// Fast (<2s), free, real data with condition-aware market pricing
+// Bratzilla 2000 — Multi-platform search (v3.4)
+// Fan-out: eBay Browse API + Mercari (unofficial JSON endpoint), merged into one grid.
+// If either platform fails or times out, the other still ships.
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
 // Env access that works on Netlify Edge (Deno) with safe fallbacks
 function env(key) {
-  try {
-    if (typeof Netlify !== "undefined" && Netlify.env?.get) return Netlify.env.get(key);
-  } catch (_) {}
-  try {
-    if (typeof Deno !== "undefined" && Deno.env?.get) return Deno.env.get(key);
-  } catch (_) {}
-  try {
-    if (typeof process !== "undefined" && process.env) return process.env[key];
-  } catch (_) {}
+  try { if (typeof Netlify !== "undefined" && Netlify.env?.get) return Netlify.env.get(key); } catch (_) {}
+  try { if (typeof Deno !== "undefined" && Deno.env?.get) return Deno.env.get(key); } catch (_) {}
+  try { if (typeof process !== "undefined" && process.env) return process.env[key]; } catch (_) {}
   return null;
 }
 
-// Module-scope token cache
-let cachedToken = null;
-let tokenExpiry = 0;
+// Module-scope token cache for eBay
+let cachedEbayToken = null;
+let ebayTokenExpiry = 0;
+
+// Wrap fetch with a hard timeout so we never hang on a slow upstream
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/* ============================================================
+   eBay
+   ============================================================ */
 
 async function getEbayToken(appId, certId) {
-  if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
+  if (cachedEbayToken && Date.now() < ebayTokenExpiry) return cachedEbayToken;
 
   const credentials = btoa(`${appId}:${certId}`);
   const resp = await fetchWithTimeout("https://api.ebay.com/identity/v1/oauth2/token", {
@@ -44,27 +54,12 @@ async function getEbayToken(appId, certId) {
   }
 
   const data = await resp.json();
-  cachedToken = data.access_token;
-  tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
-  return cachedToken;
-}
-
-// Wrap fetch with a hard timeout so we never hang on a slow eBay response
-async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: ctrl.signal });
-  } finally {
-    clearTimeout(timer);
-  }
+  cachedEbayToken = data.access_token;
+  ebayTokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+  return cachedEbayToken;
 }
 
 async function searchEbay(token, query) {
-  // Use relevance (default) — eBay's "best match" beats price-asc for deal hunting
-  // fieldgroups=EXTENDED gives us conditionId + better images
-  // category_ids=237 = "Dolls & Bears" — constrains results to actual dolls,
-  // filtering out books, posters, video games, etc. that share keywords with Bratz characters
   const params = new URLSearchParams({
     q: query,
     limit: "50",
@@ -96,29 +91,13 @@ async function searchEbay(token, query) {
   return await resp.json();
 }
 
-// Right-size eBay image URLs for the card display (cards are ~300px max)
-// s-l400 hits a sweet spot: sharp on retina, ~half the bytes of s-l500/640
+// Right-size eBay image URLs (cards are ~300px max)
 function upscaleImage(url) {
   if (!url) return "";
   return url.replace(/\/s-l\d+(\.(jpg|jpeg|png|webp))/i, "/s-l400$1");
 }
 
-// Bucket listings by condition so we can compute fair market medians
-function categorize(title, condition) {
-  const t = (title || "").toLowerCase();
-  const c = (condition || "").toLowerCase();
-
-  if (/\b(nrfb|sealed|mib|misb|unopened|never removed)\b/.test(t)) return "premium";
-  if (c === "new" || c === "new (other)") return "premium";
-
-  if (/\b(parts|broken|damaged|missing|incomplete|as.is|as\s+is|stained|tlc|nude\s+doll)\b/.test(t)) return "damaged";
-  if (c === "for parts" || c === "acceptable") return "damaged";
-
-  return "standard";
-}
-
-// Pull the best-available price from an eBay item (handles auctions with 0 bids etc)
-function extractPrice(item) {
+function extractEbayPrice(item) {
   const candidates = [
     item.currentBidPrice?.value,
     item.price?.value,
@@ -132,24 +111,133 @@ function extractPrice(item) {
   return 0;
 }
 
-// Compute market stats per category + overall, with outlier trimming
-function computeMarketStats(items) {
-  if (!items || items.length === 0) return null;
+/* ============================================================
+   Mercari (unofficial — uses the same JSON endpoint mercari.com calls from the browser)
+   ============================================================ */
 
-  const condMap = {
-    NEW: "New", NEW_OTHER: "New (other)", NEW_WITH_DEFECTS: "New",
-    USED_EXCELLENT: "Excellent", USED_VERY_GOOD: "Very Good",
-    USED_GOOD: "Good", USED_ACCEPTABLE: "Acceptable",
-    FOR_PARTS_OR_NOT_WORKING: "For Parts",
+async function searchMercari(query) {
+  // This is the endpoint Mercari's own search page hits. It's public (no auth) but
+  // requires the dpop header pattern they use for browser requests. We send a
+  // minimal-but-valid request that mimics a real browser session.
+  //
+  // If they tighten this in the future, this whole function can throw and the
+  // fan-out keeps eBay working.
+
+  const body = {
+    userId: "",
+    pageSize: 60,
+    pageToken: "",
+    searchSessionId: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    indexType: "INDEX_TYPE_DEFAULT",
+    thumbnailTypes: [],
+    searchCondition: {
+      keyword: query,
+      excludeKeyword: "",
+      sort: "SORT_SCORE",
+      order: "ORDER_DESC",
+      status: ["STATUS_ON_SALE"],
+      sizeId: [],
+      categoryId: [],
+      brandId: [],
+      sellerId: [],
+      priceMin: 0,
+      priceMax: 0,
+      itemConditionId: [],
+      shippingPayerId: [],
+      shippingFromArea: [],
+      shippingMethod: [],
+      colorId: [],
+      hasCoupon: false,
+      attributes: [],
+      itemTypes: [],
+      skuIds: [],
+    },
+    defaultDatasets: [],
+    serviceFrom: "suruga",
+    withItemBrand: true,
+    withItemSize: false,
+    withItemPromotions: true,
+    withItemSizes: true,
+    withShopName: false,
   };
 
+  const resp = await fetchWithTimeout("https://api.mercari.com/v2/entities:search", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "*/*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Origin": "https://www.mercari.com",
+      "Referer": "https://www.mercari.com/",
+      "X-Platform": "web",
+    },
+    body: JSON.stringify(body),
+  }, 7000);
+
+  if (!resp.ok) {
+    throw new Error(`Mercari search failed (${resp.status})`);
+  }
+
+  return await resp.json();
+}
+
+function extractMercariPrice(item) {
+  const candidates = [item.price, item.priceData?.price, item.itemPrice];
+  for (const c of candidates) {
+    const n = parseFloat(c);
+    if (n > 0) return n;
+  }
+  return 0;
+}
+
+function mercariConditionLabel(id) {
+  // Mercari condition IDs roughly map to:
+  const map = {
+    1: "New", 2: "Like New", 3: "Good", 4: "Fair", 5: "Poor", 6: "For Parts",
+  };
+  return map[id] || "Used";
+}
+
+function mercariImageUrl(item) {
+  // Mercari items have a `thumbnails` array or `photos` field; shape varies.
+  if (Array.isArray(item.thumbnails) && item.thumbnails.length) return item.thumbnails[0];
+  if (Array.isArray(item.photos) && item.photos.length) {
+    const p = item.photos[0];
+    return typeof p === "string" ? p : (p.url || p.uri || "");
+  }
+  if (item.thumbnail) return item.thumbnail;
+  if (item.imageUrl) return item.imageUrl;
+  return "";
+}
+
+/* ============================================================
+   Shared market math
+   ============================================================ */
+
+function categorize(title, condition) {
+  const t = (title || "").toLowerCase();
+  const c = (condition || "").toLowerCase();
+
+  if (/\b(nrfb|sealed|mib|misb|unopened|never removed)\b/.test(t)) return "premium";
+  if (c === "new" || c === "new (other)" || c === "like new") return "premium";
+
+  if (/\b(parts|broken|damaged|missing|incomplete|as.is|as\s+is|stained|tlc|nude\s+doll)\b/.test(t)) return "damaged";
+  if (c === "for parts" || c === "acceptable" || c === "poor" || c === "fair") return "damaged";
+
+  return "standard";
+}
+
+// Build a single combined market view across both platforms — gives a more
+// accurate median when one platform has thin data.
+function computeMarketStats(allUnified) {
+  if (!allUnified || allUnified.length === 0) return null;
+
   const buckets = { premium: [], standard: [], damaged: [] };
-  for (const item of items) {
-    const price = extractPrice(item);
-    if (price <= 0 || price > 2500) continue;
-    const cond = condMap[(item.condition || "").toUpperCase()] || item.condition || "Used";
-    const cat = categorize(item.title || "", cond);
-    buckets[cat].push(price);
+  for (const item of allUnified) {
+    if (item.price <= 0 || item.price > 2500) continue;
+    const cat = categorize(item.title, item.condition);
+    buckets[cat].push(item.price);
   }
 
   const summarize = (arr) => {
@@ -183,19 +271,18 @@ function marketValueFor(category, stats, fallbackPrice) {
   return stats[category]?.median || stats.overall?.median || fallbackPrice;
 }
 
-// Drop obvious junk results that slip past eBay's category filter
-// (keychains, t-shirts, posters, books with same names, video games, etc.)
+/* ============================================================
+   Junk filter (shared)
+   ============================================================ */
+
 function isJunk(title, query) {
   const t = (title || "").toLowerCase();
   const q = (query || "").toLowerCase();
 
-  // Always reject these regardless of search
   if (/\b(keychain|key chain|ornament|poster|print\b|sticker|magnet|digital download|pdf|mug|t.?shirt|shirt only|patch|button pin|badge|funko pop|funko\b|coloring book|coloring page|video game|playstation|xbox|nintendo|dvd|vhs|blu.?ray|book\b|paperback|hardcover|novel|warriors|tigerstar|bobblehead|trading card|figurine\s+only)\b/.test(t)) {
     return true;
   }
 
-  // For doll-focused searches, require the title to actually mention bratz, doll,
-  // or a known Bratz character/line name. This catches things like cat books matching "sasha".
   const dollSearch = q.includes("doll") || q.includes("bratz");
   if (dollSearch) {
     const hasBratzMention = /\b(bratz|bratzilla|bratzillaz|cloe|chloe|yasmin|jade|sasha|meygan|dana|fianna|nevra|jasmin|raya|nora|mga|babyz|kidz|boyz|tweevils|liltz|petz|pretty.n.punk|tokyo|genie|forever diamondz|rock angelz|wild wild west|passion 4 fashion|formal funk|slumber party|girls nite|ice champions|wintertime|treasures|princess|twiins|prom|featherageous|sun kissed|magic hair|spring break|sweet dreamz|passion 4|funk n glow|step out|fashion pixiez|dynamite|midnight dance|live in concert|secret date|nighty.nightz|space angelz|sleepover|on.the.mic|good vibes)\b/i.test(t);
@@ -205,27 +292,26 @@ function isJunk(title, query) {
   return false;
 }
 
-function normalizeItem(item, stats) {
-  const price = extractPrice(item);
+/* ============================================================
+   Normalizers — both platforms output the same shape
+   ============================================================ */
+
+function normalizeEbayItem(item, stats) {
+  const price = extractEbayPrice(item);
   const shipping = parseFloat(item.shippingOptions?.[0]?.shippingCost?.value || 0);
 
   const condMap = {
-    NEW: "New",
-    NEW_OTHER: "New (other)",
-    NEW_WITH_DEFECTS: "New w/ defects",
-    MANUFACTURER_REFURBISHED: "Refurb",
-    SELLER_REFURBISHED: "Refurb",
-    USED_EXCELLENT: "Excellent",
-    USED_VERY_GOOD: "Very Good",
-    USED_GOOD: "Good",
-    USED_ACCEPTABLE: "Acceptable",
+    NEW: "New", NEW_OTHER: "New (other)", NEW_WITH_DEFECTS: "New w/ defects",
+    MANUFACTURER_REFURBISHED: "Refurb", SELLER_REFURBISHED: "Refurb",
+    USED_EXCELLENT: "Excellent", USED_VERY_GOOD: "Very Good",
+    USED_GOOD: "Good", USED_ACCEPTABLE: "Acceptable",
     FOR_PARTS_OR_NOT_WORKING: "For Parts",
   };
   const condition = condMap[(item.condition || "").toUpperCase()] || item.condition || "Used";
   const category = categorize(item.title || "", condition);
   const marketValue = marketValueFor(category, stats, price);
 
-  // Profit math — eBay fees (~15% final value + payment processing) + avg $9 ship
+  // eBay fees: ~15% final value + payment processing, then -$9 ship cost we'd eat
   const EBAY_FEE = 0.15;
   const SHIP_COST = 9;
   const resaleNet = marketValue * (1 - EBAY_FEE) - SHIP_COST;
@@ -250,13 +336,11 @@ function normalizeItem(item, stats) {
     ? parseFloat(item.seller.feedbackPercentage)
     : null;
 
-  // Penalize BUY NOW recs if seller feedback is shaky
   if (sellerFeedback !== null && sellerFeedback < 95 && recommendation === "BUY NOW") {
     recommendation = "WATCH";
     recReason = `Seller feedback ${sellerFeedback}% — verify before buying`;
   }
 
-  // Auction countdown
   let timeRemaining = null;
   let endingSoon = false;
   if (item.itemEndDate) {
@@ -276,7 +360,7 @@ function normalizeItem(item, stats) {
   }
 
   return {
-    id: item.itemId || "rnd-" + Math.random().toString(36).slice(2, 10),
+    id: "ebay-" + (item.itemId || Math.random().toString(36).slice(2, 10)),
     title: item.title || "Untitled",
     price,
     shipping,
@@ -306,6 +390,79 @@ function normalizeItem(item, stats) {
     aiNotes: null,
   };
 }
+
+function normalizeMercariItem(item, stats) {
+  const price = extractMercariPrice(item);
+  // Mercari ships "free" to the buyer in the listed price for most items, but the
+  // seller eats the shipping cost. From a flipper's POV (we're the buyer reselling),
+  // shipping to us is included in the price — there's no separate ship line.
+  const shipping = 0;
+
+  const condition = mercariConditionLabel(item.itemConditionId || item.condition?.id);
+  const category = categorize(item.name || item.title || "", condition);
+  const title = item.name || item.title || "Untitled";
+  const marketValue = marketValueFor(category, stats, price);
+
+  // Mercari fees when WE eventually resell: 10% selling fee + 2.9% + $0.50 payment processing
+  // = ~13% effective. Plus we'd ship at our cost (~$9 priority).
+  const MERCARI_FEE = 0.13;
+  const SHIP_COST = 9;
+  const resaleNet = marketValue * (1 - MERCARI_FEE) - SHIP_COST;
+  const totalCost = price; // no separate shipping at purchase
+  const profit = resaleNet - totalCost;
+  const profitPct = totalCost > 0 ? (profit / totalCost) * 100 : 0;
+
+  let recommendation = "SKIP";
+  let recReason = "Priced at or above market";
+  if (profit > 25 && profitPct > 30) {
+    recommendation = "BUY NOW";
+    recReason = `$${Math.round(profit)} profit · ${Math.round(profitPct)}% margin`;
+  } else if (profit > 10 && profitPct > 15) {
+    recommendation = "WATCH";
+    recReason = `$${Math.round(profit)} profit · ${Math.round(profitPct)}% margin`;
+  } else if (profit > 0) {
+    recommendation = "MAYBE";
+    recReason = `Thin margin · ${Math.round(profitPct)}%`;
+  }
+
+  const itemId = item.id || item.itemId || "";
+  const url = itemId ? `https://www.mercari.com/us/item/${itemId}/` : "https://www.mercari.com/";
+
+  return {
+    id: "mercari-" + (itemId || Math.random().toString(36).slice(2, 10)),
+    title,
+    price,
+    shipping,
+    totalCost: +price.toFixed(2),
+    platform: "Mercari",
+    condition,
+    category,
+    url,
+    image: mercariImageUrl(item),
+    seller: item.seller?.name || item.sellerName || "",
+    sellerFeedback: null, // Mercari uses star ratings, not %, so we hide for now
+    sellerCount: item.seller?.numSellItems || 0,
+    location: "US",
+    buyingOption: "FIXED_PRICE",
+    endDate: null,
+    bids: 0,
+    listingDate: item.created || item.updated || null,
+    marketValue: +marketValue.toFixed(2),
+    estimatedProfit: +profit.toFixed(2),
+    profitPercent: Math.round(profitPct),
+    recommendation,
+    recReason,
+    timeRemaining: null,
+    endingSoon: false,
+    rarityScore: null,
+    rarityLabel: null,
+    aiNotes: null,
+  };
+}
+
+/* ============================================================
+   Main handler
+   ============================================================ */
 
 export default async (req) => {
   if (req.method === "OPTIONS") return new Response("", { status: 200, headers: CORS });
@@ -348,10 +505,6 @@ export default async (req) => {
     }
 
     let query = rawQuery;
-
-    // Auto-add "bratz" to the query if it isn't already there.
-    // Catches cases like searching "sasha" or "cloe" which would otherwise return
-    // tons of unrelated stuff (Tigerstar and Sasha cat books, etc).
     if (!/\bbratz/i.test(query)) {
       query = `bratz ${query}`;
     }
@@ -366,22 +519,53 @@ export default async (req) => {
       }
     }
 
-    const token = await getEbayToken(appId, certId);
-    const searchData = await searchEbay(token, query);
+    // Fan out to both platforms in parallel — neither blocks the other
+    const ebayPromise = (async () => {
+      const token = await getEbayToken(appId, certId);
+      return await searchEbay(token, query);
+    })();
 
-    let items = searchData.itemSummaries || [];
-    const preFilterCount = items.length;
-    items = items.filter((i) => !isJunk(i.title || "", rawQuery));
+    const mercariPromise = searchMercari(query);
 
-    // Strict-match filter: if the user's raw query mentions specific Bratz characters
-    // or distinctive terms, the listing title must actually contain at least one of them.
-    // This stops eBay from returning Sasha dolls when you search for Cloe just because
-    // the listing has the word "bratz" in it.
+    const [ebayResult, mercariResult] = await Promise.allSettled([ebayPromise, mercariPromise]);
+
+    // Track per-platform status so we can tell the user when one fails
+    const platformStatus = { ebay: "ok", mercari: "ok" };
+    const platformErrors = {};
+
+    let ebayItems = [];
+    if (ebayResult.status === "fulfilled") {
+      ebayItems = ebayResult.value.itemSummaries || [];
+    } else {
+      platformStatus.ebay = "failed";
+      platformErrors.ebay = ebayResult.reason?.message || "eBay request failed";
+      console.error("eBay error:", platformErrors.ebay);
+    }
+
+    let mercariItems = [];
+    if (mercariResult.status === "fulfilled") {
+      // Mercari response shape: { items: [...] } or { data: { items: [...] } }
+      mercariItems = mercariResult.value?.items
+        || mercariResult.value?.data?.items
+        || mercariResult.value?.results
+        || [];
+    } else {
+      platformStatus.mercari = "failed";
+      platformErrors.mercari = mercariResult.reason?.message || "Mercari request failed";
+      console.warn("Mercari error:", platformErrors.mercari);
+    }
+
+    // Filter junk per platform (use raw user query for the strict-match rules)
+    const preFilterEbay = ebayItems.length;
+    const preFilterMercari = mercariItems.length;
+
+    ebayItems = ebayItems.filter(i => !isJunk(i.title || "", rawQuery));
+    mercariItems = mercariItems.filter(i => !isJunk(i.name || i.title || "", rawQuery));
+
+    // Strict-match filter — title must contain a distinctive term the user mentioned
     const distinctiveTerms = [
-      // Characters
       "cloe", "chloe", "yasmin", "jade", "sasha", "meygan", "dana", "fianna", "nevra",
       "jasmin", "raya", "nora", "phoebe", "roxxi",
-      // Lines (multi-word)
       "rock angelz", "tokyo a go-go", "tokyo a go go", "tokyo", "genie magic", "wild wild west",
       "forever diamondz", "passion 4 fashion", "passion for fashion", "formal funk",
       "slumber party", "girls nite out", "girls night out", "ice champions", "wintertime",
@@ -389,9 +573,7 @@ export default async (req) => {
       "magic hair", "spring break", "sweet dreamz", "funk n glow", "step out", "pretty n punk",
       "fashion pixiez", "dynamite", "midnight dance", "live in concert", "secret date",
       "space angelz", "sleepover", "good vibes", "first edition", "starringas",
-      // Sub-brands
       "babyz", "kidz", "boyz", "tweevils", "liltz", "petz", "bratzilla", "bratzillaz",
-      // Special qualifiers
       "nrfb", "sealed", "mib", "misb"
     ];
 
@@ -399,31 +581,52 @@ export default async (req) => {
     const userMentionedTerms = distinctiveTerms.filter(t => rawLower.includes(t));
 
     if (userMentionedTerms.length > 0) {
-      // Build regex: title must contain at least one of the user's distinctive terms
       const escaped = userMentionedTerms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
       const matchRe = new RegExp(`\\b(${escaped.join("|")})\\b`, "i");
-      items = items.filter(i => matchRe.test(i.title || ""));
+      ebayItems = ebayItems.filter(i => matchRe.test(i.title || ""));
+      mercariItems = mercariItems.filter(i => matchRe.test(i.name || i.title || ""));
     }
 
-    // Drop listings without a usable price — usually auctions in a transitional state
-    // where eBay hasn't published the current bid yet. They render as $0.00 otherwise.
-    items = items.filter(i => extractPrice(i) > 0);
+    // Drop priceless listings (transitional auctions, weird Mercari edge cases)
+    ebayItems = ebayItems.filter(i => extractEbayPrice(i) > 0);
+    mercariItems = mercariItems.filter(i => extractMercariPrice(i) > 0);
 
-    const junkFiltered = preFilterCount - items.length;
+    const junkFiltered = (preFilterEbay + preFilterMercari) - (ebayItems.length + mercariItems.length);
 
-    if (items.length === 0) {
+    // Build the unified pricing pool BEFORE normalizing — so market median uses both platforms
+    const pricingPool = [
+      ...ebayItems.map(i => ({
+        title: i.title || "",
+        price: extractEbayPrice(i),
+        condition: i.condition || "Used",
+      })),
+      ...mercariItems.map(i => ({
+        title: i.name || i.title || "",
+        price: extractMercariPrice(i),
+        condition: mercariConditionLabel(i.itemConditionId || i.condition?.id),
+      })),
+    ];
+
+    const stats = computeMarketStats(pricingPool);
+
+    // Normalize both platforms with the unified market view
+    let listings = [
+      ...ebayItems.map(i => normalizeEbayItem(i, stats)),
+      ...mercariItems.map(i => normalizeMercariItem(i, stats)),
+    ];
+
+    if (listings.length === 0) {
       return new Response(
         JSON.stringify({
           listings: [],
           stats: null,
-          warning: "No listings found. Try a broader search term.",
+          platformStatus,
+          platformErrors,
+          warning: "No listings found on either platform. Try a broader search.",
         }),
         { status: 200, headers: { "Content-Type": "application/json", ...CORS } }
       );
     }
-
-    const stats = computeMarketStats(items);
-    let listings = items.map((item) => normalizeItem(item, stats));
 
     const recOrder = { "BUY NOW": 4, WATCH: 3, MAYBE: 2, SKIP: 1 };
     if (mode === "deals") {
@@ -450,12 +653,20 @@ export default async (req) => {
       });
     }
 
+    const platformCounts = {
+      eBay: listings.filter(l => l.platform === "eBay").length,
+      Mercari: listings.filter(l => l.platform === "Mercari").length,
+    };
+
     return new Response(
       JSON.stringify({
-        listings: listings.slice(0, 50),
+        listings: listings.slice(0, 80),
         stats,
-        total: searchData.total || items.length,
+        total: listings.length,
         junkFiltered,
+        platformStatus,
+        platformErrors,
+        platformCounts,
         query,
         rawQuery,
         mode,
@@ -465,9 +676,6 @@ export default async (req) => {
         status: 200,
         headers: {
           "Content-Type": "application/json",
-          // No edge caching — every search hits eBay fresh.
-          // Client-side localStorage cache (60s TTL) handles repeat-query optimization.
-          // Edge caching with query-param keys was unreliable in practice.
           "Cache-Control": "no-store",
           ...CORS,
         },

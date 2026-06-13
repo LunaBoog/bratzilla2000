@@ -1,6 +1,8 @@
-// Bratzilla 2000 — Claude rarity & insight analyzer (v3.2)
-// Runs after eBay search to add collector context + sales recommendations
-// Uses Claude Haiku 4.5 for speed (~$0.002 per scan)
+// Bratzilla 2000 — Claude rarity & insight analyzer (v3.4)
+// Runs after search to add collector context + sales recommendations.
+// Platform-agnostic: works the same for eBay and Mercari listings since both
+// arrive in the same {title, price, condition} shape.
+// Uses Claude Haiku 4.5 for speed (~$0.002 per scan).
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -41,7 +43,6 @@ export default async (req) => {
       });
     }
 
-    // Include price + condition so Claude can flag over/underpriced items
     const numbered = listings
       .map((l, i) => `${i}: "${l.title}" — $${l.price} (${l.condition || "Used"})`)
       .join("\n");
@@ -77,7 +78,6 @@ For generic/uncertain items, still return an entry with best-guess score and emp
 LISTINGS:
 ${numbered}`;
 
-    // Hard timeout — if Anthropic is slow, give up at 12s and let the user keep their results
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 12000);
 

@@ -10,6 +10,8 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💎</text></svg>">
 <link rel="preconnect" href="https://i.ebayimg.com" crossorigin>
 <link rel="dns-prefetch" href="https://i.ebayimg.com">
+<link rel="preconnect" href="https://static.mercdn.net" crossorigin>
+<link rel="dns-prefetch" href="https://static.mercdn.net">
 <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
@@ -35,6 +37,11 @@
   --radius: 14px;
   --radius-sm: 10px;
   --mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  --plat-ebay: #0064d2;
+  --plat-mercari: #ff5722;
+  --plat-etsy: #f1641e;
+  --plat-depop: #ff2300;
+  --plat-poshmark: #731a3e;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -103,7 +110,7 @@ button { font-family: inherit; }
 .btn-scan:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 8px 28px rgba(196,113,245,.3); }
 .btn-scan:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; filter: none; }
 
-/* Autocomplete / history */
+/* Autocomplete */
 .ac-drop {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0;
   background: var(--surface); border: 1px solid var(--border);
@@ -112,19 +119,12 @@ button { font-family: inherit; }
   box-shadow: 0 14px 48px rgba(0,0,0,.5);
 }
 .ac-drop.on { display: block; }
-.ac-item {
-  padding: 9px 12px; border-radius: 8px; cursor: pointer;
-  font-size: .82rem; display: flex; align-items: center; gap: 10px;
-  color: var(--text);
-}
+.ac-item { padding: 9px 12px; border-radius: 8px; cursor: pointer; font-size: .82rem; display: flex; align-items: center; gap: 10px; color: var(--text); }
 .ac-item:hover, .ac-item.active { background: var(--surface2); }
 .ac-ico { color: var(--text-dim); font-size: .9rem; flex-shrink: 0; }
 .ac-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ac-badge { font-size: .62rem; color: var(--text-faint); background: var(--surface2); padding: 2px 7px; border-radius: 4px; }
-.ac-header {
-  padding: 6px 12px 4px; font-size: .6rem; color: var(--text-faint);
-  text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600;
-}
+.ac-header { padding: 6px 12px 4px; font-size: .6rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600; }
 
 /* Modes & tags */
 .modes { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -135,6 +135,32 @@ button { font-family: inherit; }
 }
 .mode-btn:hover { color: var(--text); border-color: var(--border-hover); }
 .mode-btn.active { background: rgba(196,113,245,.14); border-color: rgba(196,113,245,.35); color: var(--accent); }
+
+/* Deep-link row — search elsewhere */
+.deeplinks {
+  display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;
+}
+.deeplinks-lbl {
+  font-size: .6rem; color: var(--text-faint); text-transform: uppercase;
+  letter-spacing: 1.2px; font-weight: 600; margin-right: 4px;
+}
+.dl-btn {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
+  padding: 7px 14px; border-radius: 40px; font-size: .72rem; font-weight: 600;
+  cursor: pointer; transition: all .2s; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.dl-btn:hover { color: #fff; border-color: var(--border-hover); transform: translateY(-1px); }
+.dl-btn .dl-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.dl-btn[data-platform="etsy"]:hover { border-color: var(--plat-etsy); }
+.dl-btn[data-platform="etsy"] .dl-dot { background: var(--plat-etsy); }
+.dl-btn[data-platform="depop"]:hover { border-color: var(--plat-depop); }
+.dl-btn[data-platform="depop"] .dl-dot { background: var(--plat-depop); }
+.dl-btn[data-platform="poshmark"]:hover { border-color: var(--plat-poshmark); }
+.dl-btn[data-platform="poshmark"] .dl-dot { background: var(--plat-poshmark); }
+
 .tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag {
   font-size: .68rem; font-weight: 500; padding: 5px 12px; border-radius: 40px;
@@ -164,6 +190,14 @@ button { font-family: inherit; }
   border-radius: var(--radius); color: var(--red); font-size: .82rem; text-align: center;
 }
 .error-bar.on { display: block; }
+
+.partial-warn {
+  display: none; margin: 12px 0; padding: 10px 14px;
+  background: rgba(251,146,60,.08); border: 1px solid rgba(251,146,60,.2);
+  border-radius: var(--radius); color: var(--orange);
+  font-size: .76rem; text-align: center;
+}
+.partial-warn.on { display: block; }
 
 /* Market stats bar */
 .market-bar { display: none; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 16px 0 14px; }
@@ -200,6 +234,9 @@ button { font-family: inherit; }
 }
 .f-chip:hover { color: #fff; border-color: var(--border-hover); }
 .f-chip.on { background: rgba(196,113,245,.15); color: var(--accent); border-color: rgba(196,113,245,.3); }
+.f-chip.platform-ebay.on { background: rgba(0,100,210,.15); color: #4d9eff; border-color: rgba(0,100,210,.3); }
+.f-chip.platform-mercari.on { background: rgba(255,87,34,.15); color: var(--orange); border-color: rgba(255,87,34,.3); }
+.f-divider { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
 .f-count { margin-left: auto; font-size: .72rem; color: var(--text-faint); font-family: var(--mono); }
 .f-reset { font-size: .68rem; color: var(--text-dim); background: none; border: none; cursor: pointer; padding: 5px 10px; }
 .f-reset:hover { color: var(--accent); }
@@ -255,6 +292,16 @@ button { font-family: inherit; }
 .rec-maybe { background: var(--gold); color: #0b0b0f; border-color: transparent; }
 .rec-skip { opacity: .7; }
 @keyframes pulse-green { 0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.4)} 50%{box-shadow:0 0 0 6px rgba(74,222,128,0)} }
+
+/* Platform badge — small, on the card image */
+.plat-badge {
+  font-size: .56rem; font-weight: 800; padding: 4px 8px; border-radius: 4px;
+  letter-spacing: .6px; text-transform: uppercase; color: #fff;
+  background: rgba(11,11,15,.85); border: 1px solid rgba(255,255,255,.12);
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.plat-badge.plat-ebay { background: var(--plat-ebay); border-color: transparent; }
+.plat-badge.plat-mercari { background: var(--plat-mercari); border-color: transparent; }
 
 .rarity-badge {
   font-size: .58rem; font-weight: 700; padding: 4px 9px; border-radius: 40px;
@@ -412,14 +459,13 @@ button { font-family: inherit; }
   border: 1px solid var(--border-hover);
 }
 
-/* Touch devices: disable hover scale transforms (expensive, also visually weird on touch) */
+/* Touch devices: disable hover-only effects */
 @media (hover: none) {
   .card:hover { transform: none; }
   .card:hover .card-img img { transform: none; }
   [data-tip]:hover::after { display: none; }
 }
 
-/* Respect users with motion sensitivity */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
@@ -430,7 +476,6 @@ button { font-family: inherit; }
   .rec-buy, .flag-HOT, .auction-timer.soon { animation: none !important; }
 }
 
-/* Save bandwidth flag — slow connection */
 @media (prefers-reduced-data: reduce) {
   .hdr::after { display: none; }
   .skeleton .sk-img { animation: none; background: var(--surface2); }
@@ -464,7 +509,7 @@ button { font-family: inherit; }
     <div class="hdr-top">
       <div>
         <div class="logo">BRATZILLA<em>2000</em></div>
-        <div class="tagline">Live eBay Scanner · Real Profit Math · AI Rarity</div>
+        <div class="tagline">eBay + Mercari · Real Profit Math · AI Rarity</div>
       </div>
       <div class="hdr-actions">
         <button class="btn-icon" id="alertsBtn" onclick="toggleAlerts()" data-tip="Price alerts">
@@ -498,6 +543,19 @@ button { font-family: inherit; }
       <button class="mode-btn" data-mode="lots" onclick="setMode(this)">📦 Lots & Bundles</button>
     </div>
 
+    <div class="deeplinks">
+      <span class="deeplinks-lbl">Also search →</span>
+      <a class="dl-btn" data-platform="etsy" href="#" target="_blank" rel="noopener" onclick="return openDeepLink(event, 'etsy')">
+        <span class="dl-dot"></span>Etsy
+      </a>
+      <a class="dl-btn" data-platform="depop" href="#" target="_blank" rel="noopener" onclick="return openDeepLink(event, 'depop')">
+        <span class="dl-dot"></span>Depop
+      </a>
+      <a class="dl-btn" data-platform="poshmark" href="#" target="_blank" rel="noopener" onclick="return openDeepLink(event, 'poshmark')">
+        <span class="dl-dot"></span>Poshmark
+      </a>
+    </div>
+
     <div class="tags" id="tagStrip">
       <span class="tag" data-q="bratz doll">bratz doll</span>
       <span class="tag" data-q="bratz doll lot">bratz lot</span>
@@ -518,13 +576,14 @@ button { font-family: inherit; }
 
   <div class="status" id="statusBar">
     <span class="spinner"></span>
-    <span class="status-msg" id="statusMsg">Searching eBay...</span>
+    <span class="status-msg" id="statusMsg">Searching...</span>
   </div>
   <div class="error-bar" id="errorBar"></div>
+  <div class="partial-warn" id="partialWarn"></div>
 
   <div class="market-bar" id="marketBar">
-    <div class="mstat" data-tip="Total listings returned"><div class="mstat-val" id="mListings" style="color:#fff">0</div><div class="mstat-lbl">Listings</div></div>
-    <div class="mstat" data-tip="Median of all prices"><div class="mstat-val" id="mMedian" style="color:var(--accent)">—</div><div class="mstat-lbl">Market Median</div></div>
+    <div class="mstat" id="mListingsBox" data-tip="eBay + Mercari combined"><div class="mstat-val" id="mListings" style="color:#fff">0</div><div class="mstat-lbl">Listings</div></div>
+    <div class="mstat" data-tip="Median across both platforms"><div class="mstat-val" id="mMedian" style="color:var(--accent)">—</div><div class="mstat-lbl">Market Median</div></div>
     <div class="mstat" data-tip="Listings flagged BUY NOW"><div class="mstat-val" id="mBuyNow" style="color:var(--green)">0</div><div class="mstat-lbl">Buy Now</div></div>
     <div class="mstat" data-tip="Highest profit listing"><div class="mstat-val" id="mTopProfit" style="color:var(--green)">—</div><div class="mstat-lbl">Top Profit</div></div>
     <div class="mstat" data-tip="Auctions ending soon"><div class="mstat-val" id="mEndingSoon" style="color:var(--red)">0</div><div class="mstat-lbl">Ending Soon</div></div>
@@ -543,6 +602,9 @@ button { font-family: inherit; }
         <option value="new">Newest Listed</option>
       </select>
     </div>
+    <span class="f-chip platform-ebay" id="fPlatEbay" onclick="toggleChip(this)">eBay</span>
+    <span class="f-chip platform-mercari" id="fPlatMercari" onclick="toggleChip(this)">Mercari</span>
+    <span class="f-divider"></span>
     <span class="f-chip" id="fBuyNow" onclick="toggleChip(this)">💰 Buy Now only</span>
     <span class="f-chip" id="fNRFB" onclick="toggleChip(this)">✨ NRFB/Sealed</span>
     <span class="f-chip" id="fEnding" onclick="toggleChip(this)">⏱️ Ending soon</span>
@@ -563,7 +625,7 @@ button { font-family: inherit; }
     <div class="empty">
       <div class="empty-ico">💎</div>
       <h3>Ready to Hunt</h3>
-      <p>Hit SCAN to pull live eBay listings. Results include real profit math, AI rarity scoring, and BUY NOW flags for genuine deals.</p>
+      <p>Hit SCAN to pull live listings from eBay and Mercari side by side. Real profit math, AI rarity, BUY NOW flags. Use the deep-links above to also browse Etsy, Depop, and Poshmark.</p>
     </div>
   </div>
 </div>
@@ -598,10 +660,10 @@ const STORE = {
   WL: 'bratzilla_wl_v4',
   HIST: 'bratzilla_hist_v1',
   PRICES: 'bratzilla_prices_v1',
-  CACHE: 'bratzilla_cache_v1',  // {key: {ts, data}} — client-side request cache
+  CACHE: 'bratzilla_cache_v2',  // bumped from v1 — payload shape changed (multi-platform)
 };
 
-const CACHE_TTL_MS = 60_000;  // 60s — matches edge cache window
+const CACHE_TTL_MS = 60_000;
 
 let allListings = [];
 let marketStats = null;
@@ -613,8 +675,8 @@ let scanning = false;
 let currentMode = 'deals';
 let activeChips = new Set();
 let acIndex = -1;
-let activeAbortController = null;  // for cancelling in-flight scans
-let scanId = 0;  // monotonic ID; callbacks check this to detect stale state
+let activeAbortController = null;
+let scanId = 0;
 
 function loadStore(k, d) {
   try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; }
@@ -623,7 +685,6 @@ function saveStore(k, v) {
   try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
 }
 
-/* Prune cache entries older than 5 min on load to keep localStorage tidy */
 (function pruneCache() {
   const cutoff = Date.now() - 300_000;
   let dirty = false;
@@ -633,7 +694,6 @@ function saveStore(k, v) {
   if (dirty) saveStore(STORE.CACHE, requestCache);
 })();
 
-/* Detect slow connection so we can degrade gracefully */
 function isSlowConnection() {
   const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   if (!c) return false;
@@ -642,11 +702,9 @@ function isSlowConnection() {
   return false;
 }
 
-/* fetchWithTimeout — abort hanging requests so Safari/Chrome don't wait forever */
 async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  // If caller passes their own signal, chain it
   if (options.signal) {
     options.signal.addEventListener('abort', () => ctrl.abort(), { once: true });
   }
@@ -664,6 +722,7 @@ window.addEventListener('DOMContentLoaded', () => {
   updateBadge();
   refreshSearchClear();
   checkPriceAlerts();
+  updateDeepLinks();
 });
 
 /* ============================================================
@@ -690,11 +749,46 @@ function timeAgo(ts) {
 }
 
 /* ============================================================
+   DEEP LINKS — Etsy / Depop / Poshmark
+   These rebuild every time the search box changes so the buttons
+   are always pre-loaded with the user's current query.
+   ============================================================ */
+function buildDeepLink(platform, query) {
+  const q = encodeURIComponent(query.trim() || 'bratz doll');
+  switch (platform) {
+    case 'etsy':
+      return `https://www.etsy.com/search?q=${q}&order=date_desc`;
+    case 'depop':
+      return `https://www.depop.com/search/?q=${q}`;
+    case 'poshmark':
+      return `https://poshmark.com/search?query=${q}&type=listings`;
+    default:
+      return '#';
+  }
+}
+
+function updateDeepLinks() {
+  const q = document.getElementById('searchInput').value.trim() || 'bratz doll';
+  document.querySelectorAll('.dl-btn').forEach(btn => {
+    btn.setAttribute('href', buildDeepLink(btn.dataset.platform, q));
+  });
+}
+
+function openDeepLink(ev, platform) {
+  // We update the href on the fly so middle-clicks and right-click "open in new tab"
+  // work without depending on the JS handler. This is just a safety net.
+  const q = document.getElementById('searchInput').value.trim() || 'bratz doll';
+  ev.currentTarget.setAttribute('href', buildDeepLink(platform, q));
+  return true;
+}
+
+/* ============================================================
    SEARCH UI
    ============================================================ */
 function setQ(t) {
   document.getElementById('searchInput').value = t;
   refreshSearchClear();
+  updateDeepLinks();
   startScan();
 }
 
@@ -709,6 +803,7 @@ function clearSearch() {
   const inp = document.getElementById('searchInput');
   inp.value = '';
   refreshSearchClear();
+  updateDeepLinks();
   inp.focus();
 }
 
@@ -723,7 +818,7 @@ document.getElementById('tagStrip').addEventListener('click', (e) => {
 });
 
 /* ============================================================
-   AUTOCOMPLETE / SEARCH HISTORY
+   AUTOCOMPLETE
    ============================================================ */
 function onSearchKey(ev) {
   const drop = document.getElementById('acDrop');
@@ -756,6 +851,7 @@ function updateAcHighlight() {
 let acDebounce = null;
 function onSearchInput() {
   refreshSearchClear();
+  updateDeepLinks();
   clearTimeout(acDebounce);
   acDebounce = setTimeout(showAutocomplete, 80);
 }
@@ -842,6 +938,14 @@ function showError(msg) {
   el.textContent = msg; el.classList.add('on');
   setTimeout(() => el.classList.remove('on'), 12000);
 }
+function showPartialWarn(msg) {
+  const el = document.getElementById('partialWarn');
+  el.textContent = msg;
+  el.classList.add('on');
+}
+function hidePartialWarn() {
+  document.getElementById('partialWarn').classList.remove('on');
+}
 
 function renderSkeleton(n = 9) {
   const area = document.getElementById('resultsArea');
@@ -858,35 +962,31 @@ function renderEmpty(h3, p) {
 
 async function startScan() {
   const query = document.getElementById('searchInput').value.trim();
-  console.log('[SCAN]', JSON.stringify({step:'start', query, mode: currentMode, time: new Date().toLocaleTimeString()}));
   if (!query) { showError('Enter a search term first.'); return; }
 
-  // Cancel any in-flight scan + bump scan ID so stale callbacks bail
   if (activeAbortController) { activeAbortController.abort(); }
   activeAbortController = new AbortController();
   const myController = activeAbortController;
   const myScanId = ++scanId;
 
-  // Clear current listings immediately so user never sees stale results from prior search
   allListings = [];
   marketStats = null;
+  hidePartialWarn();
 
   scanning = true;
   const btn = document.getElementById('scanBtn');
   btn.disabled = true; btn.textContent = 'SCANNING...';
   document.getElementById('errorBar').classList.remove('on');
 
-  // Client-side cache check — keyed on (mode, normalized-query) so different searches never collide
   const cacheKey = currentMode + '|' + query.toLowerCase().replace(/\s+/g, ' ').trim();
   const cached = requestCache[cacheKey];
-  console.log('[SCAN]', JSON.stringify({step:'cacheCheck', cacheKey, cacheHit: !!cached, allCacheKeys: Object.keys(requestCache)}));
   if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS) {
-    console.log('[SCAN]', JSON.stringify({step:'cacheServe', firstTitle: cached.data?.listings?.[0]?.title, count: cached.data?.listings?.length}));
-    if (myScanId !== scanId) return;  // a newer scan started while we were checking
+    if (myScanId !== scanId) return;
     allListings = cached.data.listings || [];
     marketStats = cached.data.stats;
     addToHistory(query);
     showStatus(`Loaded ${allListings.length} listings from cache (${Math.round((Date.now()-cached.ts)/1000)}s old)`);
+    if (cached.data.platformStatus) showPlatformWarning(cached.data.platformStatus, cached.data.platformErrors);
     updateMarketBar();
     render();
     document.getElementById('marketBar').classList.add('on');
@@ -903,20 +1003,18 @@ async function startScan() {
     return;
   }
 
-  showStatus(`Fetching live eBay listings for "${query}"...`);
+  showStatus(`Searching eBay + Mercari for "${query}"...`);
   renderSkeleton(9);
 
   try {
     const t0 = performance.now();
     const url = `/api/search?q=${encodeURIComponent(query)}&mode=${encodeURIComponent(currentMode)}`;
-    console.log('[SCAN]', JSON.stringify({step:'fetch', url}));
     const resp = await fetchWithTimeout(url, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
       signal: myController.signal,
     }, 15000);
 
-    // Bail if a newer scan superseded this one
     if (myScanId !== scanId) return;
 
     if (!resp.ok) {
@@ -925,15 +1023,15 @@ async function startScan() {
     }
 
     const data = await resp.json();
-    console.log('[SCAN]', JSON.stringify({step:'fetched', queryEcho: data.rawQuery, count: data.listings?.length, firstTitle: data.listings?.[0]?.title}));
-    if (myScanId !== scanId) return;  // recheck after JSON parse
+    if (myScanId !== scanId) return;
 
     allListings = data.listings || [];
     marketStats = data.stats;
     addToHistory(query);
     recordPricesForWatchlist();
 
-    // Save to client cache
+    if (data.platformStatus) showPlatformWarning(data.platformStatus, data.platformErrors);
+
     requestCache[cacheKey] = { ts: Date.now(), data };
     const keys = Object.keys(requestCache);
     if (keys.length > 20) {
@@ -947,11 +1045,17 @@ async function startScan() {
     if (allListings.length === 0) {
       showError(data.warning || 'No listings found. Try a broader search.');
       hideStatus();
-      renderEmpty('No Matches', 'Try a broader search term or different mode.');
+      renderEmpty('No Matches', 'Try a broader search term or different mode. The deep-link buttons above will search Etsy, Depop, and Poshmark in a new tab.');
       return;
     }
 
-    showStatus(`Found ${allListings.length} listings in ${elapsed}ms${isSlowConnection() ? '' : ' · Analyzing rarity...'}`);
+    const counts = data.platformCounts || {};
+    const platformStr = Object.entries(counts)
+      .filter(([_, n]) => n > 0)
+      .map(([k, n]) => `${n} ${k}`)
+      .join(' + ');
+
+    showStatus(`Found ${allListings.length} listings (${platformStr}) in ${elapsed}ms${isSlowConnection() ? '' : ' · Analyzing rarity...'}`);
     updateMarketBar();
     render();
     document.getElementById('marketBar').classList.add('on');
@@ -971,7 +1075,7 @@ async function startScan() {
       if (myScanId === scanId) {
         showError('Search took too long. Tap SCAN to retry.');
         hideStatus();
-        renderEmpty('Timed out', 'eBay took too long to respond. Try again — they\'re usually faster.');
+        renderEmpty('Timed out', 'eBay or Mercari took too long to respond. Try again.');
       }
       return;
     }
@@ -990,11 +1094,20 @@ async function startScan() {
   }
 }
 
+function showPlatformWarning(status, errors) {
+  // Surface a soft warning when one platform fails but the other works
+  if (!status) { hidePartialWarn(); return; }
+  const failures = Object.entries(status).filter(([_, v]) => v !== 'ok').map(([k]) => k);
+  if (failures.length === 0) { hidePartialWarn(); return; }
+  if (failures.length === 2) { hidePartialWarn(); return; }  // both failed → main error bar handles it
+  const platName = failures[0] === 'ebay' ? 'eBay' : 'Mercari';
+  const otherName = failures[0] === 'ebay' ? 'Mercari' : 'eBay';
+  showPartialWarn(`⚠ ${platName} didn't respond — showing ${otherName} results only. Tap SCAN to retry.`);
+}
+
 async function analyzeRarity(myScanId) {
-  // Snapshot the listings we're analyzing so we have a stable reference
   const top = allListings.slice(0, 20);
   if (!top.length) return;
-  // Remember which array these belonged to — if it gets replaced, we bail
   const myListings = allListings;
   try {
     const resp = await fetchWithTimeout('/api/analyze', {
@@ -1004,7 +1117,6 @@ async function analyzeRarity(myScanId) {
     }, 15000);
     if (!resp.ok) return;
     const data = await resp.json();
-    // If a newer scan replaced allListings, don't write to the old one
     if (myScanId !== undefined && myScanId !== scanId) return;
     if (myListings !== allListings) return;
     const ratings = data.ratings || [];
@@ -1017,7 +1129,6 @@ async function analyzeRarity(myScanId) {
       }
     }
   } catch (e) {
-    // Silent — AI analysis is bonus, not critical
     if (e.name !== 'AbortError') console.warn('analyze failed:', e);
   }
 }
@@ -1080,6 +1191,13 @@ function checkPriceAlerts() {
    ============================================================ */
 function updateMarketBar() {
   document.getElementById('mListings').textContent = allListings.length;
+
+  // Update tooltip with platform breakdown
+  const eBayCount = allListings.filter(l => l.platform === 'eBay').length;
+  const mercariCount = allListings.filter(l => l.platform === 'Mercari').length;
+  document.getElementById('mListingsBox').setAttribute('data-tip',
+    `${eBayCount} eBay + ${mercariCount} Mercari`);
+
   if (marketStats?.overall) document.getElementById('mMedian').textContent = '$' + Math.round(marketStats.overall.median);
   else document.getElementById('mMedian').textContent = '—';
   const buyNow = allListings.filter(l => l.recommendation === 'BUY NOW').length;
@@ -1118,7 +1236,16 @@ function getFiltered() {
 
   const nrfbRe = /\b(nrfb|sealed|mib|misb|unopened|never removed|new in box)\b/i;
 
+  // Platform filter logic: if neither platform chip is on → show all platforms.
+  // If one is on → show only that platform. If both on → show all (same as none on).
+  const ebayOn = activeChips.has('fPlatEbay');
+  const mercariOn = activeChips.has('fPlatMercari');
+  const platformFilter = (ebayOn && !mercariOn) ? 'eBay'
+                       : (mercariOn && !ebayOn) ? 'Mercari'
+                       : null;
+
   let f = allListings.filter(l => {
+    if (platformFilter && l.platform !== platformFilter) return false;
     if (l.price > maxPrice) return false;
     if (hasMinProfit && l.estimatedProfit < minProfit) return false;
     if (activeChips.has('fBuyNow') && l.recommendation !== 'BUY NOW') return false;
@@ -1165,6 +1292,12 @@ function recClass(r) {
   return 'rec-skip';
 }
 
+function platformClass(p) {
+  if (p === 'eBay') return 'plat-ebay';
+  if (p === 'Mercari') return 'plat-mercari';
+  return '';
+}
+
 function render() {
   const filtered = getFiltered();
   updateMarketBar();
@@ -1172,7 +1305,7 @@ function render() {
 
   const area = document.getElementById('resultsArea');
   if (!filtered.length && !allListings.length) {
-    area.innerHTML = '<div class="empty"><div class="empty-ico">💎</div><h3>Ready to Hunt</h3><p>Hit SCAN to pull live eBay listings.</p></div>';
+    area.innerHTML = '<div class="empty"><div class="empty-ico">💎</div><h3>Ready to Hunt</h3><p>Hit SCAN to pull live listings.</p></div>';
     return;
   }
   if (!filtered.length) {
@@ -1187,7 +1320,9 @@ function render() {
     const rarity = l.rarityScore;
     const rarityClass = rarity >= 8 ? 'r-high' : '';
     const rLabel = rarity ? `${rarity}/10` : '';
-    const shipStr = l.shipping === 0 ? 'Free ship' : `+$${l.shipping.toFixed(2)} ship`;
+    const shipStr = l.platform === 'Mercari'
+      ? 'Free ship'
+      : (l.shipping === 0 ? 'Free ship' : `+$${l.shipping.toFixed(2)} ship`);
     const profitClass = l.estimatedProfit > 0 ? 'profit-pos' : 'profit-neg';
     const profitStr = l.estimatedProfit > 0
       ? `<span class="profit-arrow">▲</span>+$${Math.round(l.estimatedProfit)} (${l.profitPercent}%)`
@@ -1218,6 +1353,15 @@ function render() {
       aiChip = `<div class="ai-chip"><span class="ai-chip-ico">✨</span><span class="ai-chip-label">${esc(l.rarityLabel)}</span></div>`;
     }
 
+    // Mercari listings don't expose seller feedback %, so show "—" for those
+    const sellerStr = l.sellerFeedback !== null
+      ? l.sellerFeedback + '%'
+      : (l.platform === 'Mercari' ? '—' : '—');
+
+    const buyTypeStr = l.buyingOption === 'AUCTION'
+      ? (l.bids ? l.bids + ' bid' + (l.bids !== 1 ? 's' : '') : 'Auction')
+      : 'Buy Now';
+
     h += `<div class="${cardClass}" style="animation-delay:${delay}ms">
       <div class="card-img">
         ${l.image
@@ -1226,6 +1370,7 @@ function render() {
         <div class="badge-row-top">
           <div class="badge-stack-left">
             <span class="rec-badge ${recClass(l.recommendation)}" data-tip="${esc(l.recReason || '')}">${esc(l.recommendation)}</span>
+            <span class="plat-badge ${platformClass(l.platform)}">${esc(l.platform)}</span>
             ${flagBadge}
           </div>
           <div class="badge-stack-right">
@@ -1241,18 +1386,18 @@ function render() {
           <span class="card-ship">${shipStr}</span>
           ${marketCrossed}
         </div>
-        <div class="profit-line ${profitClass}" data-tip="Market $${Math.round(l.marketValue)} minus 15% fees + $9 ship">${profitStr} profit</div>
+        <div class="profit-line ${profitClass}" data-tip="${esc(l.platform === 'Mercari' ? 'Market $'+Math.round(l.marketValue)+' minus 13% Mercari fees + $9 ship' : 'Market $'+Math.round(l.marketValue)+' minus 15% eBay fees + $9 ship')}">${profitStr} profit</div>
         ${aiChip}
         <div class="card-meta">
           <div class="meta-item"><span class="meta-k">Condition</span><span class="meta-v">${esc(l.condition)}</span></div>
           <div class="meta-item"><span class="meta-k">Market</span><span class="meta-v">$${Math.round(l.marketValue)}</span></div>
-          <div class="meta-item"><span class="meta-k">Seller</span><span class="meta-v ${lowSellerClass}">${l.sellerFeedback !== null ? l.sellerFeedback + '%' : '—'}</span></div>
-          <div class="meta-item"><span class="meta-k">Type</span><span class="meta-v">${l.buyingOption === 'AUCTION' ? (l.bids ? l.bids + ' bid' + (l.bids !== 1 ? 's' : '') : 'Auction') : 'Buy Now'}</span></div>
+          <div class="meta-item"><span class="meta-k">Seller</span><span class="meta-v ${lowSellerClass}">${sellerStr}</span></div>
+          <div class="meta-item"><span class="meta-k">Type</span><span class="meta-v">${buyTypeStr}</span></div>
         </div>
         <div class="card-foot">
           <button class="btn-sm btn-save ${isSaved ? 'on' : ''}" onclick="toggleSave('${esc(l.id)}')" data-tip="${isSaved ? 'Unsave' : 'Save & track'}">${isSaved ? '★' : '☆'}</button>
           <button class="btn-sm btn-share" onclick="shareListing('${esc(l.id)}')" data-tip="Share">↗</button>
-          <a href="${esc(l.url)}" target="_blank" rel="noopener" class="btn-sm btn-view">View on eBay →</a>
+          <a href="${esc(l.url)}" target="_blank" rel="noopener" class="btn-sm btn-view">View on ${esc(l.platform)} →</a>
         </div>
       </div>
     </div>`;
@@ -1316,13 +1461,12 @@ function renderWatchlist() {
     return;
   }
 
-  // Sort: biggest price drops first, then by saved date desc
   const sorted = [...watchlist].map((w, origIdx) => ({ w, origIdx })).sort((a, b) => {
     const ca = getPriceChange(a.w.id);
     const cb = getPriceChange(b.w.id);
     const pa = ca ? ca.pct : 0;
     const pb = cb ? cb.pct : 0;
-    if (Math.abs(pb - pa) > 0.5) return pa - pb;  // drops first (more negative)
+    if (Math.abs(pb - pa) > 0.5) return pa - pb;
     return (b.w.savedAt || 0) - (a.w.savedAt || 0);
   });
 
@@ -1330,7 +1474,6 @@ function renderWatchlist() {
     const ch = getPriceChange(w.id);
     let chStr = '';
     if (ch && Math.abs(ch.diff) >= 0.5) {
-      // UP = bad for buyer (price went up); DOWN = good for buyer (price dropped)
       const dir = ch.diff > 0 ? 'up' : 'down';
       const sign = ch.diff > 0 ? '+' : '';
       const arrow = ch.diff > 0 ? '▲' : '▼';
@@ -1345,6 +1488,7 @@ function renderWatchlist() {
         <div class="wl-name">${esc(w.title)}</div>
         <div class="wl-detail">
           <span>$${w.price.toFixed(2)}</span>
+          <span style="color:var(--text-faint)">· ${esc(w.platform || 'eBay')}</span>
           ${chStr}
           <span style="color:var(--text-faint)">· ${esc(w.recommendation)}</span>
           <span style="color:var(--text-faint)">· saved ${timeAgo(w.savedAt || Date.now())}</span>
@@ -1365,14 +1509,14 @@ function renderWatchlist() {
 }
 
 function exportWatchlist() {
-  const txt = watchlist.map(w => `${w.title}\n$${w.price.toFixed(2)} · Profit $${Math.round(w.estimatedProfit)} · ${w.recommendation}\n${w.url}\n`).join('\n');
+  const txt = watchlist.map(w => `${w.title}\n[${w.platform || 'eBay'}] $${w.price.toFixed(2)} · Profit $${Math.round(w.estimatedProfit)} · ${w.recommendation}\n${w.url}\n`).join('\n');
   navigator.clipboard.writeText(txt).then(() => toast('Copied to clipboard', 'success'), () => toast('Copy failed', 'error'));
 }
 
 function exportWatchlistCSV() {
-  const header = 'Title,Price,Market Value,Estimated Profit,Profit %,Recommendation,Condition,Seller Feedback,URL\n';
+  const header = 'Platform,Title,Price,Market Value,Estimated Profit,Profit %,Recommendation,Condition,Seller Feedback,URL\n';
   const rows = watchlist.map(w =>
-    `"${(w.title || '').replace(/"/g, '""')}",${w.price},${w.marketValue || ''},${w.estimatedProfit},${w.profitPercent || ''},${w.recommendation},${w.condition},${w.sellerFeedback || ''},${w.url}`
+    `${w.platform || 'eBay'},"${(w.title || '').replace(/"/g, '""')}",${w.price},${w.marketValue || ''},${w.estimatedProfit},${w.profitPercent || ''},${w.recommendation},${w.condition},${w.sellerFeedback || ''},${w.url}`
   ).join('\n');
   const blob = new Blob([header + rows], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
@@ -1399,7 +1543,7 @@ function shareListing(id) {
   const l = allListings.find(x => x.id === id);
   if (!l) return;
   const profitStr = l.estimatedProfit > 0 ? `· ${l.recommendation} (+$${Math.round(l.estimatedProfit)} potential profit)` : `· ${l.recommendation}`;
-  const txt = `${l.title}\n$${l.price.toFixed(2)} on eBay ${profitStr}\n${l.url}`;
+  const txt = `${l.title}\n$${l.price.toFixed(2)} on ${l.platform} ${profitStr}\n${l.url}`;
   if (navigator.share) {
     navigator.share({ title: l.title, text: txt, url: l.url }).catch(() => {});
   } else {
@@ -1434,6 +1578,7 @@ function renderAlerts() {
           <div class="wl-info">
             <div class="wl-name">${esc(w.title)}</div>
             <div class="wl-detail">
+              <span style="color:var(--text-faint)">${esc(w.platform || 'eBay')}</span>
               <span style="text-decoration:line-through;color:var(--text-faint)">$${ch.oldest.toFixed(2)}</span>
               <span style="color:var(--green);font-weight:700">$${ch.newest.toFixed(2)}</span>
               <span class="down">▼ ${Math.round(ch.pct)}%</span>
@@ -1451,6 +1596,7 @@ function renderAlerts() {
           <div class="wl-info">
             <div class="wl-name">${esc(w.title)}</div>
             <div class="wl-detail">
+              <span style="color:var(--text-faint)">${esc(w.platform || 'eBay')}</span>
               <span style="text-decoration:line-through;color:var(--text-faint)">$${ch.oldest.toFixed(2)}</span>
               <span style="color:var(--red);font-weight:700">$${ch.newest.toFixed(2)}</span>
               <span class="up">▲ ${Math.round(ch.pct)}%</span>
